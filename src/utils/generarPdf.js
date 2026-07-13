@@ -98,9 +98,9 @@ function montoVariable(v, resultado) {
 }
 
 /** Dibuja una sección titulada con una lista de variables (con o sin precio por fila). */
-function dibujarSeccionVariables(doc, yInicial, anchoPagina, altoPagina, titulo, items, { mostrarPrecio, resultado, mensajeVacio }) {
+function dibujarSeccionVariables(doc, yInicial, anchoPagina, altoPagina, titulo, items, { mostrarPrecio, resultado, mensajeVacio, colorMarcador = COLOR_ACENTO }) {
   let y = yInicial
-  doc.setFillColor(...COLOR_ACENTO)
+  doc.setFillColor(...colorMarcador)
   doc.rect(MARGEN, y - 3, 2.5, 2.5, 'F')
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(11)
@@ -257,14 +257,16 @@ export async function generarPdfCotizacion(datos) {
   y = dibujarSeccionVariables(doc, y, anchoPagina, altoPagina, 'Configuración estándar', variablesEstandar, {
     mostrarPrecio: false,
     resultado,
-    mensajeVacio: 'Sin componentes estándar aplicados.'
+    mensajeVacio: 'Sin componentes estándar aplicados.',
+    colorMarcador: COLOR_BANNER_NEGRO
   })
 
   y += 6
   y = dibujarSeccionVariables(doc, y, anchoPagina, altoPagina, 'Añadidos opcionales', variablesOpcionales, {
     mostrarPrecio: true,
     resultado,
-    mensajeVacio: 'Sin opcionales agregados.'
+    mensajeVacio: 'Sin opcionales agregados.',
+    colorMarcador: COLOR_BANNER_NEGRO
   })
 
   const altoCaja = 27

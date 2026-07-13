@@ -60,6 +60,13 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales }) 
     [tipoTrailer, variablesSeleccionadas, redondeo]
   )
 
+  const totalOpcionales = resultado
+    ? resultado.detalle.filter(d => d.esOpcional).reduce((acc, d) => acc + d.monto, 0)
+    : 0
+  const precioEstandar = resultado
+    ? resultado.base + resultado.detalle.filter(d => !d.esOpcional).reduce((acc, d) => acc + d.monto, 0)
+    : 0
+
   function toggleVariable(id) {
     setSeleccionadas(prev => {
       if (Object.prototype.hasOwnProperty.call(prev, id)) {
@@ -187,7 +194,10 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales }) 
 
       {resultado && (
         <div className="resultado">
-          <p>Base: {formatoARS.format(resultado.base)}</p>
+          <p>Precio estándar: {formatoARS.format(precioEstandar)}</p>
+          {totalOpcionales !== 0 && (
+            <p>Adicionales opcionales: {formatoARS.format(totalOpcionales)}</p>
+          )}
           <h3>Total: {formatoARS.format(resultado.precioFinal)} <span className="nota-iva">{NOTA_IVA}</span></h3>
           <div className="form-inline">
             <button onClick={guardarCotizacion}>Guardar cotización</button>

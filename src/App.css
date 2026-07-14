@@ -283,7 +283,7 @@ main {
   margin-left: 0.35rem;
 }
 
-.etiqueta-cantidad { color: var(--success); background: var(--success-soft); }
+.etiqueta-cantidad,
 .etiqueta-opcional { color: var(--accent-ink); background: var(--accent-soft); }
 
 .miniaturas-imagenes {

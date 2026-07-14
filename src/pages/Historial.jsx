@@ -86,7 +86,7 @@ export default function Historial({ onDuplicar }) {
 
   return (
     <div className="page">
-      <h2>Historial de cotizaciones</h2>
+      <h2 className="titulo-pagina">Historial de cotizaciones</h2>
 
       <div className="form-inline">
         <input
@@ -110,7 +110,7 @@ export default function Historial({ onDuplicar }) {
         {cotizacionesFiltradas.map(c => (
           <li key={c.id}>
             <span>
-              {new Date(c.fecha).toLocaleString('es-AR')} — {textoCliente(c)} — {nombreTipo(c.tipoTrailerId)} — <strong>{formatoARS.format(c.precioFinal)}</strong> <span className="nota-iva">{NOTA_IVA}</span>
+              {new Date(c.fecha).toLocaleString('es-AR')} — {textoCliente(c)} — {nombreTipo(c.tipoTrailerId)} — <strong className="price-num">{formatoARS.format(c.precioFinal)}</strong> <span className="nota-iva">{NOTA_IVA}</span>
             </span>
             <span className="acciones">
               <button className="btn-secundario" onClick={() => duplicar(c)}>Duplicar</button>

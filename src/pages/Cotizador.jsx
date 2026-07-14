@@ -137,69 +137,93 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales }) 
 
   return (
     <div className="page">
-      <h2>Nueva cotización</h2>
+      <h2 className="titulo-pagina">Nueva cotización</h2>
 
-      <label className="campo">
-        Nombre del cliente (opcional)
-        <input value={nombreCliente} onChange={e => setNombreCliente(e.target.value)} placeholder="Nombre del cliente" />
-      </label>
+      <div className="form-card">
+        <div className="grupo-campo">
+          <span className="grupo-titulo">Datos del cliente</span>
+          <div className="fila-campos">
+            <label className="campo">
+              Nombre del cliente (opcional)
+              <input value={nombreCliente} onChange={e => setNombreCliente(e.target.value)} placeholder="Nombre del cliente" />
+            </label>
 
-      <label className="campo">
-        Razón social (opcional)
-        <input value={razonSocial} onChange={e => setRazonSocial(e.target.value)} placeholder="Razón social" />
-      </label>
+            <label className="campo">
+              Razón social (opcional)
+              <input value={razonSocial} onChange={e => setRazonSocial(e.target.value)} placeholder="Razón social" />
+            </label>
 
-      <label className="campo">
-        CUIT (opcional)
-        <input value={cuit} onChange={e => setCuit(e.target.value)} placeholder="CUIT" />
-      </label>
-
-      <label className="campo">
-        Tipo de trailer
-        <select value={tipoTrailerId} onChange={e => setTipoTrailerId(e.target.value)}>
-          <option value="">Seleccionar...</option>
-          {tipos.map(t => (
-            <option key={t.id} value={t.id}>{t.nombre} — {formatoARS.format(t.precioBase)}</option>
-          ))}
-        </select>
-      </label>
-
-      <SelectorVariables
-        variables={variables}
-        seleccionadas={seleccionadas}
-        onToggle={toggleVariable}
-        onCantidadChange={cambiarCantidad}
-      />
-
-      <div className="campo">
-        <label>Imágenes (opcional, hasta {MAX_IMAGENES})</label>
-        <input
-          type="file"
-          accept="image/*"
-          multiple
-          onChange={agregarImagenes}
-          disabled={imagenes.length >= MAX_IMAGENES}
-        />
-        {imagenes.length > 0 && (
-          <div className="miniaturas-imagenes">
-            {imagenes.map((src, i) => (
-              <div className="miniatura-imagen" key={i}>
-                <img src={src} alt={`Imagen ${i + 1}`} />
-                <button type="button" className="btn-peligro" onClick={() => quitarImagen(i)}>Quitar</button>
-              </div>
-            ))}
+            <label className="campo">
+              CUIT (opcional)
+              <input value={cuit} onChange={e => setCuit(e.target.value)} placeholder="CUIT" />
+            </label>
           </div>
-        )}
+        </div>
+
+        <hr className="divider" />
+
+        <div className="grupo-campo">
+          <span className="grupo-titulo">Configuración</span>
+          <label className="campo">
+            Tipo de trailer
+            <select value={tipoTrailerId} onChange={e => setTipoTrailerId(e.target.value)}>
+              <option value="">Seleccionar...</option>
+              {tipos.map(t => (
+                <option key={t.id} value={t.id}>{t.nombre} — {formatoARS.format(t.precioBase)}</option>
+              ))}
+            </select>
+          </label>
+
+          <SelectorVariables
+            variables={variables}
+            seleccionadas={seleccionadas}
+            onToggle={toggleVariable}
+            onCantidadChange={cambiarCantidad}
+          />
+
+          <div className="campo">
+            <label>Imágenes (opcional, hasta {MAX_IMAGENES})</label>
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={agregarImagenes}
+              disabled={imagenes.length >= MAX_IMAGENES}
+            />
+            {imagenes.length > 0 && (
+              <div className="miniaturas-imagenes">
+                {imagenes.map((src, i) => (
+                  <div className="miniatura-imagen" key={i}>
+                    <img src={src} alt={`Imagen ${i + 1}`} />
+                    <button type="button" className="btn-peligro" onClick={() => quitarImagen(i)}>Quitar</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {resultado && (
         <div className="resultado">
-          <p>Precio estándar: {formatoARS.format(precioEstandar)}</p>
+          <div className="linea-precio">
+            <span>Precio estándar</span>
+            <span className="price-num">{formatoARS.format(precioEstandar)}</span>
+          </div>
           {totalOpcionales !== 0 && (
-            <p>Adicionales opcionales: {formatoARS.format(totalOpcionales)}</p>
+            <div className="linea-precio">
+              <span>Adicionales opcionales</span>
+              <span className="price-num">{formatoARS.format(totalOpcionales)}</span>
+            </div>
           )}
-          <h3>Total: {formatoARS.format(resultado.precioFinal)} <span className="nota-iva">{NOTA_IVA}</span></h3>
-          <div className="form-inline">
+          <div className="total-row">
+            <span className="etiqueta">Total</span>
+            <span>
+              <span className="valor price-num">{formatoARS.format(resultado.precioFinal)}</span>
+              <span className="nota-iva">{NOTA_IVA}</span>
+            </span>
+          </div>
+          <div className="acciones-resultado">
             <button onClick={guardarCotizacion}>Guardar cotización</button>
             <button className="btn-secundario" onClick={descargarPdf}>Descargar PDF</button>
           </div>

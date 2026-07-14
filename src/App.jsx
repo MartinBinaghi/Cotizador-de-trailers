@@ -14,13 +14,29 @@ const TABS = {
   historial: { label: 'Historial' }
 }
 
+function temaInicial() {
+  const guardado = localStorage.getItem('tema')
+  if (guardado === 'claro' || guardado === 'oscuro') return guardado
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'oscuro' : 'claro'
+}
+
 export default function App() {
   const [tab, setTab] = useState('cotizador')
   const [datosParaDuplicar, setDatosParaDuplicar] = useState(null)
+  const [tema, setTema] = useState(temaInicial)
 
   useEffect(() => {
     seedIfEmpty()
   }, [])
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = tema === 'oscuro' ? 'dark' : 'light'
+    localStorage.setItem('tema', tema)
+  }, [tema])
+
+  function alternarTema() {
+    setTema(prev => (prev === 'oscuro' ? 'claro' : 'oscuro'))
+  }
 
   function handleDuplicar(datos) {
     setDatosParaDuplicar(datos)
@@ -31,18 +47,35 @@ export default function App() {
     <ToastProvider>
       <div className="app">
         <header className="app-header">
-          <h1>Cotizador de Trailers</h1>
-          <nav>
-            {Object.entries(TABS).map(([key, { label }]) => (
-              <button
-                key={key}
-                className={key === tab ? 'activo' : ''}
-                onClick={() => setTab(key)}
-              >
-                {label}
-              </button>
-            ))}
-          </nav>
+          <div className="brand">
+            <img src="/logo.png" alt="BINA Maquinarias" />
+            <div className="brand-text">
+              <strong>BINA Maquinarias</strong>
+              <span>Cotizador de Trailers</span>
+            </div>
+          </div>
+          <div className="app-header-derecha">
+            <nav>
+              {Object.entries(TABS).map(([key, { label }]) => (
+                <button
+                  key={key}
+                  className={key === tab ? 'activo' : ''}
+                  onClick={() => setTab(key)}
+                >
+                  {label}
+                </button>
+              ))}
+            </nav>
+            <button
+              type="button"
+              className="btn-tema"
+              onClick={alternarTema}
+              aria-label={tema === 'oscuro' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+              title={tema === 'oscuro' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+            >
+              {tema === 'oscuro' ? '☀️' : '🌙'}
+            </button>
+          </div>
         </header>
         <main>
           {tab === 'cotizador' && (

@@ -132,7 +132,7 @@ export default function Comparativa() {
 
   return (
     <div className="page page-comparativa">
-      <h2>Comparativa de modelos</h2>
+      <h2 className="titulo-pagina">Comparativa de modelos</h2>
       <p className="texto-ayuda">
         Armá dos o más configuraciones (distinto tipo de trailer y/o variables) y
         compará los resultados lado a lado para mostrárselos al cliente.
@@ -184,7 +184,7 @@ export default function Comparativa() {
                 <tr>
                   <td>Precio estándar</td>
                   {filasComparativa.map(f => (
-                    <td key={f.modelo.id}>{f.resultado ? formatoARS.format(f.precioEstandar) : '—'}</td>
+                    <td key={f.modelo.id} className={f.resultado ? 'price-num' : ''}>{f.resultado ? formatoARS.format(f.precioEstandar) : '—'}</td>
                   ))}
                 </tr>
                 {variablesEnUso.map(v => (
@@ -195,7 +195,7 @@ export default function Comparativa() {
                       if (v.esOpcional) {
                         const detalleItem = f.resultado?.detalle.find(d => d.id === v.id)
                         return (
-                          <td key={f.modelo.id}>{detalleItem ? formatoARS.format(detalleItem.monto) : '—'}</td>
+                          <td key={f.modelo.id} className={detalleItem ? 'price-num' : ''}>{detalleItem ? formatoARS.format(detalleItem.monto) : '—'}</td>
                         )
                       }
                       return (
@@ -211,7 +211,7 @@ export default function Comparativa() {
                 <tr className="fila-total">
                   <td>Total</td>
                   {filasComparativa.map(f => (
-                    <td key={f.modelo.id}>
+                    <td key={f.modelo.id} className={f.resultado ? 'price-num' : ''}>
                       {f.resultado ? (
                         <>
                           <strong>{formatoARS.format(f.resultado.precioFinal)}</strong> <span className="nota-iva">{NOTA_IVA}</span>

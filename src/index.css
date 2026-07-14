@@ -1,10 +1,99 @@
+:root {
+  --paper: #F6F4EE;
+  --surface: #FFFFFF;
+  --ink: #201D17;
+  --ink-soft: #625C4E;
+  --ink-faint: #928A76;
+  --line: #E5E0D2;
+  --line-strong: #D2CAB4;
+  --accent: #F3C400;
+  --accent-ink: #362B00;
+  --accent-soft: #FBEEB2;
+  --graphite: #6E6A60;
+  --success: #1E7A4C;
+  --success-soft: #DCEFE2;
+  --danger: #B23A2E;
+  --danger-soft: #F6DFDA;
+  --shadow: 0 1px 2px rgba(32,29,23,0.04), 0 8px 20px -12px rgba(32,29,23,0.18);
+  --shadow-lg: 0 4px 10px rgba(32,29,23,0.05), 0 20px 40px -20px rgba(32,29,23,0.28);
+  --radius: 10px;
+  /* Banda de marca (header, thead, avisos): negro fijo, no se invierte con el tema. */
+  --band: #0A0908;
+  --band-ink: #F4F2EA;
+  --band-ink-soft: #C9C4B4;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #15140F;
+    --surface: #1F1D16;
+    --ink: #F2EEE2;
+    --ink-soft: #C6BFAC;
+    --ink-faint: #948C77;
+    --line: #34301F;
+    --line-strong: #48412A;
+    --accent-ink: #241D00;
+    --accent-soft: #453A12;
+    --graphite: #9C9686;
+    --success: #49C08B;
+    --success-soft: #1D3327;
+    --danger: #E2685A;
+    --danger-soft: #3B2320;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 20px -12px rgba(0,0,0,0.5);
+    --shadow-lg: 0 4px 10px rgba(0,0,0,0.35), 0 24px 44px -20px rgba(0,0,0,0.6);
+  }
+}
+
+/* Selección manual de tema (botón en el header), tiene prioridad sobre el sistema operativo */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --paper: #F6F4EE;
+  --surface: #FFFFFF;
+  --ink: #201D17;
+  --ink-soft: #625C4E;
+  --ink-faint: #928A76;
+  --line: #E5E0D2;
+  --line-strong: #D2CAB4;
+  --accent-ink: #362B00;
+  --accent-soft: #FBEEB2;
+  --graphite: #6E6A60;
+  --success: #1E7A4C;
+  --success-soft: #DCEFE2;
+  --danger: #B23A2E;
+  --danger-soft: #F6DFDA;
+  --shadow: 0 1px 2px rgba(32,29,23,0.04), 0 8px 20px -12px rgba(32,29,23,0.18);
+  --shadow-lg: 0 4px 10px rgba(32,29,23,0.05), 0 20px 40px -20px rgba(32,29,23,0.28);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #15140F;
+  --surface: #1F1D16;
+  --ink: #F2EEE2;
+  --ink-soft: #C6BFAC;
+  --ink-faint: #948C77;
+  --line: #34301F;
+  --line-strong: #48412A;
+  --accent-ink: #241D00;
+  --accent-soft: #453A12;
+  --graphite: #9C9686;
+  --success: #49C08B;
+  --success-soft: #1D3327;
+  --danger: #E2685A;
+  --danger-soft: #3B2320;
+  --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 20px -12px rgba(0,0,0,0.5);
+  --shadow-lg: 0 4px 10px rgba(0,0,0,0.35), 0 24px 44px -20px rgba(0,0,0,0.6);
+}
+
 * { box-sizing: border-box; }
 
 body {
   margin: 0;
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  background: #f1f5f9;
-  color: #0f172a;
+  background: var(--paper);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
 }
 
 input, select, button {
@@ -12,16 +101,23 @@ input, select, button {
   font-size: 1rem;
 }
 
+.price-num {
+  font-family: ui-monospace, "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
 button {
   cursor: pointer;
   border: none;
-  background: #1e293b;
-  color: white;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
   padding: 0.5rem 1rem;
   border-radius: 6px;
+  transition: filter 0.15s ease, background 0.15s ease, border-color 0.15s ease;
 }
 
-button:hover { background: #334155; }
+button:hover { filter: brightness(1.05); }
 
 button:disabled {
   opacity: 0.6;

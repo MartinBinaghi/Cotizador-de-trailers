@@ -7,7 +7,7 @@ import { useToast } from '../components/Toast'
 export default function Admin() {
   return (
     <div className="page">
-      <h2>Administrar catálogo</h2>
+      <h2 className="titulo-pagina">Administrar catálogo</h2>
       <ConfigRedondeo />
       <AjustePreciosMasivo />
       <AdminTiposTrailer />

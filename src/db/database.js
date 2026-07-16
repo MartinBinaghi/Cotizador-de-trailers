@@ -278,15 +278,18 @@ export async function setRedondeo(valor) {
 // --- Ajuste masivo de precios ---
 
 /**
- * Aumenta (o disminuye, si porcentaje es negativo) todos los precios en
- * pesos del catálogo: el precioBase de cada tipo de trailer, y el valor
- * de las variables cuyo tipoModificador sea 'fijo'. Las variables
- * 'porcentual' NO se tocan (aumentar un 10% un "+15%" no tiene sentido).
+ * Aumenta (o disminuye, si porcentaje es negativo) los precios en pesos de
+ * los ítems seleccionados del catálogo: el precioBase de los tipos de
+ * trailer cuyo id esté en idsTipos, y el valor de las variables cuyo id
+ * esté en idsVariables y cuyo tipoModificador sea 'fijo'. Las variables
+ * 'porcentual' NUNCA se tocan (aumentar un 10% un "+15%" no tiene sentido).
  *
  * @param {number} porcentaje ej: 10 para +10%, -5 para -5%
+ * @param {number[]} idsTipos ids de tiposTrailer a actualizar
+ * @param {number[]} idsVariables ids de variables (fijo) a actualizar
  * @returns {Promise<{tiposActualizados: number, variablesActualizadas: number}>}
  */
-export async function actualizarPreciosPorcentaje(porcentaje) {
+export async function actualizarPreciosPorcentaje(porcentaje, idsTipos = [], idsVariables = []) {
   const pct = Number(porcentaje)
   if (Number.isNaN(pct)) {
     throw new Error('El porcentaje debe ser un número.')
@@ -294,24 +297,32 @@ export async function actualizarPreciosPorcentaje(porcentaje) {
   if (pct <= -100) {
     throw new Error('El porcentaje no puede ser -100% o menor (dejaría precios en cero o negativos).')
   }
+  if (idsTipos.length === 0 && idsVariables.length === 0) {
+    throw new Error('Seleccioná al menos un tipo de trailer o variable.')
+  }
 
   const factor = 1 + pct / 100
   let tiposActualizados = 0
   let variablesActualizadas = 0
 
   await db.transaction('rw', db.tiposTrailer, db.variables, async () => {
-    await db.tiposTrailer.toCollection().modify(tipo => {
-      tipo.precioBase = Math.round(tipo.precioBase * factor)
-      tiposActualizados++
-    })
-
-    await db.variables
-      .where('tipoModificador')
-      .equals('fijo')
-      .modify(variable => {
-        variable.valor = Math.round(variable.valor * factor)
-        variablesActualizadas++
+    if (idsTipos.length > 0) {
+      await db.tiposTrailer.where('id').anyOf(idsTipos).modify(tipo => {
+        tipo.precioBase = Math.round(tipo.precioBase * factor)
+        tiposActualizados++
       })
+    }
+
+    if (idsVariables.length > 0) {
+      await db.variables
+        .where('id')
+        .anyOf(idsVariables)
+        .and(variable => variable.tipoModificador === 'fijo')
+        .modify(variable => {
+          variable.valor = Math.round(variable.valor * factor)
+          variablesActualizadas++
+        })
+    }
   })
 
   return { tiposActualizados, variablesActualizadas }
@@ -340,31 +351,38 @@ async function ensureCategoriasSeeded() {
 
 
 // --- Datos de ejemplo (seed) para arrancar a probar la app ---
+// Todo el chequeo + inserción va en una única transacción: si seedIfEmpty()
+// se llama dos veces casi al mismo tiempo (ej. React.StrictMode monta los
+// efectos dos veces en desarrollo), la segunda transacción queda en cola
+// hasta que la primera termine, y al ejecutar ya ve el catálogo poblado
+// en vez de volver a insertarlo (lo que antes duplicaba los tipos de trailer).
 export async function seedIfEmpty() {
-  const count = await db.tiposTrailer.count()
-  if (count > 0) {
-    await ensureCategoriasSeeded()
-    return
-  }
+  await db.transaction('rw', db.tiposTrailer, db.categorias, db.variables, async () => {
+    const count = await db.tiposTrailer.count()
+    if (count > 0) {
+      await ensureCategoriasSeeded()
+      return
+    }
 
-  await db.tiposTrailer.bulkAdd([
-    { nombre: 'Semirremolque', precioBase: 8000000 },
-    { nombre: 'Batea', precioBase: 6500000 },
-    { nombre: 'Tanque', precioBase: 9500000 }
-  ])
+    await db.tiposTrailer.bulkAdd([
+      { nombre: 'Semirremolque', precioBase: 8000000 },
+      { nombre: 'Batea', precioBase: 6500000 },
+      { nombre: 'Tanque', precioBase: 9500000 }
+    ])
 
-  await db.categorias.bulkAdd([
-    { nombre: 'Frenos' },
-    { nombre: 'Homologación' },
-    { nombre: 'Ejes' },
-    { nombre: 'Descuentos' }
-  ])
+    await db.categorias.bulkAdd([
+      { nombre: 'Frenos' },
+      { nombre: 'Homologación' },
+      { nombre: 'Ejes' },
+      { nombre: 'Descuentos' }
+    ])
 
-  await db.variables.bulkAdd([
-    { categoria: 'Frenos', nombre: '2 frenos', tipoModificador: 'fijo', valor: 150000, aplicaSobre: 'base' },
-    { categoria: 'Frenos', nombre: '4 frenos', tipoModificador: 'fijo', valor: 300000, aplicaSobre: 'base' },
-    { categoria: 'Homologación', nombre: 'Homologado', tipoModificador: 'porcentual', valor: 15, aplicaSobre: 'subtotal' },
-    { categoria: 'Ejes', nombre: 'Eje reforzado', tipoModificador: 'fijo', valor: 400000, aplicaSobre: 'base' },
-    { categoria: 'Descuentos', nombre: 'Descuento por pago de contado', tipoModificador: 'porcentual', valor: -5, aplicaSobre: 'subtotal' }
-  ])
+    await db.variables.bulkAdd([
+      { categoria: 'Frenos', nombre: '2 frenos', tipoModificador: 'fijo', valor: 150000, aplicaSobre: 'base' },
+      { categoria: 'Frenos', nombre: '4 frenos', tipoModificador: 'fijo', valor: 300000, aplicaSobre: 'base' },
+      { categoria: 'Homologación', nombre: 'Homologado', tipoModificador: 'porcentual', valor: 15, aplicaSobre: 'subtotal' },
+      { categoria: 'Ejes', nombre: 'Eje reforzado', tipoModificador: 'fijo', valor: 400000, aplicaSobre: 'base' },
+      { categoria: 'Descuentos', nombre: 'Descuento por pago de contado', tipoModificador: 'porcentual', valor: -5, aplicaSobre: 'subtotal' }
+    ])
+  })
 }

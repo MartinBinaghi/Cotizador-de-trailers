@@ -18,9 +18,32 @@ export default function Admin() {
 }
 
 function AjustePreciosMasivo() {
+  const tipos = useLiveQuery(() => db.tiposTrailer.toArray(), []) ?? []
+  const variablesFijas = useLiveQuery(
+    () => db.variables.where('tipoModificador').equals('fijo').toArray(),
+    []
+  ) ?? []
   const showToast = useToast()
   const [porcentaje, setPorcentaje] = useState('')
   const [aplicando, setAplicando] = useState(false)
+  // Set de ids EXCLUIDOS del ajuste. Vacío = todo seleccionado (default).
+  const [tiposExcluidos, setTiposExcluidos] = useState(new Set())
+  const [variablesExcluidas, setVariablesExcluidas] = useState(new Set())
+
+  const tiposOrdenados = [...tipos].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+  const variablesOrdenadas = [...variablesFijas].sort((a, b) => {
+    const porCategoria = a.categoria.localeCompare(b.categoria, 'es')
+    return porCategoria !== 0 ? porCategoria : a.nombre.localeCompare(b.nombre, 'es')
+  })
+
+  function toggle(setExcluidos, id) {
+    setExcluidos(prev => {
+      const nuevo = new Set(prev)
+      if (nuevo.has(id)) nuevo.delete(id)
+      else nuevo.add(id)
+      return nuevo
+    })
+  }
 
   async function aplicar() {
     const pct = Number(porcentaje)
@@ -34,17 +57,26 @@ function AjustePreciosMasivo() {
       return
     }
 
+    const idsTipos = tiposOrdenados.filter(t => !tiposExcluidos.has(t.id)).map(t => t.id)
+    const idsVariables = variablesOrdenadas.filter(v => !variablesExcluidas.has(v.id)).map(v => v.id)
+
+    if (idsTipos.length === 0 && idsVariables.length === 0) {
+      showToast('Seleccioná al menos un tipo de trailer o variable.', 'error')
+      return
+    }
+
     const accion = pct > 0 ? 'aumentar' : 'disminuir'
     const confirmado = confirm(
-      `Esto va a ${accion} un ${Math.abs(pct)}% TODOS los precios base y valores fijos ` +
-      `del catálogo (no afecta a las variables porcentuales). ` +
+      `Esto va a ${accion} un ${Math.abs(pct)}% el precio base/valor fijo de ` +
+      `${idsTipos.length} tipo(s) de trailer y ${idsVariables.length} variable(s) ` +
+      `marcadas (no afecta a las variables porcentuales). ` +
       `Esta acción no se puede deshacer, salvo restaurando un backup. ¿Continuar?`
     )
     if (!confirmado) return
 
     setAplicando(true)
     try {
-      const { tiposActualizados, variablesActualizadas } = await actualizarPreciosPorcentaje(pct)
+      const { tiposActualizados, variablesActualizadas } = await actualizarPreciosPorcentaje(pct, idsTipos, idsVariables)
       showToast(
         `Precios actualizados: ${tiposActualizados} tipos de trailer y ${variablesActualizadas} variables.`
       )
@@ -60,11 +92,50 @@ function AjustePreciosMasivo() {
     <section className="admin-seccion">
       <h3>Ajuste masivo de precios</h3>
       <p className="texto-ayuda">
-        Aumenta o disminuye de una sola vez el precio base de todos los
-        tipos de trailer y el valor de las variables en pesos ($). Las
-        variables en porcentaje (%) no se modifican. Se recomienda
+        Aumenta o disminuye de una sola vez el precio base y el valor fijo ($)
+        de los tipos de trailer y variables que dejes marcados abajo. Las
+        variables en porcentaje (%) nunca se modifican. Se recomienda
         descargar un backup antes de aplicar un ajuste masivo.
       </p>
+
+      <div className="checklist-ajuste">
+        <div className="checklist-ajuste-columna">
+          <div className="checklist-ajuste-cabecera">
+            <span>Tipos de trailer</span>
+            <button type="button" className="btn-secundario" onClick={() => setTiposExcluidos(new Set())}>Todos</button>
+            <button type="button" className="btn-secundario" onClick={() => setTiposExcluidos(new Set(tiposOrdenados.map(t => t.id)))}>Ninguno</button>
+          </div>
+          {tiposOrdenados.map(t => (
+            <label key={t.id} className="checkbox-inline">
+              <input
+                type="checkbox"
+                checked={!tiposExcluidos.has(t.id)}
+                onChange={() => toggle(setTiposExcluidos, t.id)}
+              />
+              {t.nombre}
+            </label>
+          ))}
+        </div>
+
+        <div className="checklist-ajuste-columna">
+          <div className="checklist-ajuste-cabecera">
+            <span>Variables (monto fijo)</span>
+            <button type="button" className="btn-secundario" onClick={() => setVariablesExcluidas(new Set())}>Todas</button>
+            <button type="button" className="btn-secundario" onClick={() => setVariablesExcluidas(new Set(variablesOrdenadas.map(v => v.id)))}>Ninguna</button>
+          </div>
+          {variablesOrdenadas.map(v => (
+            <label key={v.id} className="checkbox-inline">
+              <input
+                type="checkbox"
+                checked={!variablesExcluidas.has(v.id)}
+                onChange={() => toggle(setVariablesExcluidas, v.id)}
+              />
+              [{v.categoria}] {v.nombre}
+            </label>
+          ))}
+        </div>
+      </div>
+
       <div className="form-inline">
         <input
           type="number"
@@ -114,20 +185,23 @@ function AdminTiposTrailer() {
 
   const [nombre, setNombre] = useState('')
   const [precioBase, setPrecioBase] = useState('')
+  const [ganancia, setGanancia] = useState('')
   const [error, setError] = useState(null)
 
   const [editandoId, setEditandoId] = useState(null)
   const [editNombre, setEditNombre] = useState('')
   const [editPrecio, setEditPrecio] = useState('')
+  const [editGanancia, setEditGanancia] = useState('')
 
   async function agregar() {
-    const datos = { nombre, precioBase }
+    const datos = { nombre, precioBase, ganancia }
     const err = validarTipoTrailer(datos)
     if (err) { setError(err); return }
     setError(null)
-    await db.tiposTrailer.add({ nombre: nombre.trim(), precioBase: Number(precioBase) })
+    await db.tiposTrailer.add({ nombre: nombre.trim(), precioBase: Number(precioBase), ganancia: Number(ganancia) || 1 })
     setNombre('')
     setPrecioBase('')
+    setGanancia('')
     showToast('Tipo de trailer agregado')
   }
 
@@ -142,12 +216,13 @@ function AdminTiposTrailer() {
     setEditandoId(t.id)
     setEditNombre(t.nombre)
     setEditPrecio(String(t.precioBase))
+    setEditGanancia(String(t.ganancia ?? 1))
   }
 
   async function guardarEdicion(id) {
-    const err = validarTipoTrailer({ nombre: editNombre, precioBase: editPrecio })
+    const err = validarTipoTrailer({ nombre: editNombre, precioBase: editPrecio, ganancia: editGanancia })
     if (err) { showToast(err, 'error'); return }
-    await db.tiposTrailer.update(id, { nombre: editNombre.trim(), precioBase: Number(editPrecio) })
+    await db.tiposTrailer.update(id, { nombre: editNombre.trim(), precioBase: Number(editPrecio), ganancia: Number(editGanancia) || 1 })
     setEditandoId(null)
     showToast('Cambios guardados')
   }
@@ -162,12 +237,13 @@ function AdminTiposTrailer() {
               <div className="form-inline">
                 <input value={editNombre} onChange={e => setEditNombre(e.target.value)} />
                 <input type="number" value={editPrecio} onChange={e => setEditPrecio(e.target.value)} />
+                <input type="number" step="0.1" placeholder="Ganancia (ej: 1.2)" value={editGanancia} onChange={e => setEditGanancia(e.target.value)} />
                 <button onClick={() => guardarEdicion(t.id)}>Guardar</button>
                 <button className="btn-secundario" onClick={() => setEditandoId(null)}>Cancelar</button>
               </div>
             ) : (
               <>
-                <span>{t.nombre} — ${t.precioBase.toLocaleString('es-AR')}</span>
+                <span>{t.nombre} — ${t.precioBase.toLocaleString('es-AR')} — ×{t.ganancia ?? 1}</span>
                 <span className="acciones">
                   <button className="btn-secundario" onClick={() => empezarEdicion(t)}>Editar</button>
                   <button className="btn-peligro" onClick={() => eliminar(t.id)}>Eliminar</button>
@@ -180,6 +256,7 @@ function AdminTiposTrailer() {
       <div className="form-inline">
         <input placeholder="Nombre (ej: Batea)" value={nombre} onChange={e => setNombre(e.target.value)} />
         <input placeholder="Precio base" type="number" value={precioBase} onChange={e => setPrecioBase(e.target.value)} />
+        <input placeholder="Ganancia (ej: 1.2)" type="number" step="0.1" value={ganancia} onChange={e => setGanancia(e.target.value)} />
         <button onClick={agregar}>Agregar</button>
       </div>
       {error && <p className="error-texto">{error}</p>}
@@ -196,6 +273,7 @@ function AdminVariables() {
   const [nombre, setNombre] = useState('')
   const [tipoModificador, setTipoModificador] = useState('fijo')
   const [valor, setValor] = useState('')
+  const [ganancia, setGanancia] = useState('')
   const [aplicaSobre, setAplicaSobre] = useState('base')
   const [permiteCantidad, setPermiteCantidad] = useState(false)
   const [esOpcional, setEsOpcional] = useState(false)
@@ -253,19 +331,20 @@ function AdminVariables() {
       return
     }
     
-    const datos = { categoria: catFinal, nombre, valor, tipoModificador }
+    const datos = { categoria: catFinal, nombre, valor, tipoModificador, ganancia }
     const err = validarVariable(datos)
     if (err) { setError(err); return }
     setError(null)
-    
+
     const valorFinal = procesarValor(valor, catFinal, tipoModificador)
         await asegurarCategoriaExistente(catFinal)
-    
+
     await db.variables.add({
       categoria: catFinal,
       nombre: nombre.trim(),
       tipoModificador,
       valor: valorFinal,
+      ganancia: Number(ganancia) || 1,
       aplicaSobre,
       permiteCantidad,
       esOpcional
@@ -273,6 +352,7 @@ function AdminVariables() {
     setCategoria('')
     setNombre('')
     setValor('')
+    setGanancia('')
     setNuevaCategoria('')
     setMostrarNuevaCategoria(false)
     setPermiteCantidad(false)
@@ -289,7 +369,7 @@ function AdminVariables() {
 
   function empezarEdicion(v) {
     setEditandoId(v.id)
-    setEditVar({ ...v, valor: String(Math.abs(v.valor)), permiteCantidad: !!v.permiteCantidad, esOpcional: !!v.esOpcional })
+    setEditVar({ ...v, valor: String(Math.abs(v.valor)), ganancia: String(v.ganancia ?? 1), permiteCantidad: !!v.permiteCantidad, esOpcional: !!v.esOpcional })
   }
 
   async function guardarEdicion(id) {
@@ -304,6 +384,7 @@ function AdminVariables() {
       nombre: editVar.nombre.trim(),
       tipoModificador: editVar.tipoModificador,
       valor: valorFinal,
+      ganancia: Number(editVar.ganancia) || 1,
       aplicaSobre: editVar.aplicaSobre,
       permiteCantidad: !!editVar.permiteCantidad,
       esOpcional: !!editVar.esOpcional
@@ -341,6 +422,7 @@ function AdminVariables() {
                   <option value="porcentual">Porcentaje (%)</option>
                 </select>
                 <input type="number" value={editVar.valor} onChange={e => setEditVar({ ...editVar, valor: e.target.value })} />
+                <input type="number" step="0.1" placeholder="Ganancia (ej: 1.2)" value={editVar.ganancia} onChange={e => setEditVar({ ...editVar, ganancia: e.target.value })} />
                 {editVar.tipoModificador === 'porcentual' && (
                   <select value={editVar.aplicaSobre} onChange={e => setEditVar({ ...editVar, aplicaSobre: e.target.value })}>
                     <option value="base">% sobre base</option>
@@ -369,7 +451,7 @@ function AdminVariables() {
             ) : (
               <>
                 <span>
-                  [{v.categoria}] {v.nombre} — {v.tipoModificador === 'fijo' ? `$${v.valor.toLocaleString('es-AR')}` : `${v.valor >= 0 ? '+' : ''}${v.valor}%`}
+                  [{v.categoria}] {v.nombre} — {v.tipoModificador === 'fijo' ? `$${v.valor.toLocaleString('es-AR')}` : `${v.valor >= 0 ? '+' : ''}${v.valor}%`} — ×{v.ganancia ?? 1}
                   {v.permiteCantidad && <span className="etiqueta-cantidad"> (admite cantidad)</span>}
                   {v.esOpcional && <span className="etiqueta-opcional"> (opcional)</span>}
                 </span>
@@ -427,11 +509,18 @@ function AdminVariables() {
           <option value="fijo">Monto fijo ($)</option>
           <option value="porcentual">Porcentaje (%)</option>
         </select>
-        <input 
-          placeholder="Valor" 
-          type="number" 
-          value={valor} 
+        <input
+          placeholder="Valor"
+          type="number"
+          value={valor}
           onChange={e => { setValor(e.target.value); setError(null) }}
+        />
+        <input
+          placeholder="Ganancia (ej: 1.2)"
+          type="number"
+          step="0.1"
+          value={ganancia}
+          onChange={e => { setGanancia(e.target.value); setError(null) }}
         />
         {tipoModificador === 'porcentual' && (
           <select value={aplicaSobre} onChange={e => { setAplicaSobre(e.target.value); setError(null) }}>

@@ -1,8 +1,17 @@
+/** Valida el multiplicador de ganancia (opcional: vacío = sin margen, factor 1). */
+function validarGanancia(ganancia) {
+  if (ganancia === '' || ganancia === null || ganancia === undefined) return null
+  const num = Number(ganancia)
+  if (Number.isNaN(num)) return 'La ganancia debe ser un número.'
+  if (num <= 0) return 'La ganancia debe ser mayor a 0.'
+  return null
+}
+
 /**
  * Valida los campos de un tipo de trailer.
  * @returns {string|null} mensaje de error, o null si es válido
  */
-export function validarTipoTrailer({ nombre, precioBase }) {
+export function validarTipoTrailer({ nombre, precioBase, ganancia }) {
   if (!nombre || !nombre.trim()) return 'El nombre es obligatorio.'
   if (precioBase === '' || precioBase === null || precioBase === undefined) {
     return 'El precio base es obligatorio.'
@@ -10,13 +19,13 @@ export function validarTipoTrailer({ nombre, precioBase }) {
   const num = Number(precioBase)
   if (Number.isNaN(num)) return 'El precio base debe ser un número.'
   if (num < 0) return 'El precio base no puede ser negativo.'
-  return null
+  return validarGanancia(ganancia)
 }
 
 /**
  * Valida los campos de una variable.
  */
-export function validarVariable({ categoria, nombre, valor, tipoModificador }) {
+export function validarVariable({ categoria, nombre, valor, tipoModificador, ganancia }) {
   if (!categoria || !categoria.trim()) return 'La categoría es obligatoria.'
   if (!nombre || !nombre.trim()) return 'El nombre es obligatorio.'
   if (valor === '' || valor === null || valor === undefined) return 'El valor es obligatorio.'
@@ -30,5 +39,5 @@ export function validarVariable({ categoria, nombre, valor, tipoModificador }) {
   if (tipoModificador === 'porcentual' && Math.abs(num) > 1000) {
     return 'Ese porcentaje parece demasiado alto en valor absoluto, revisá el valor.'
   }
-  return null
+  return validarGanancia(ganancia)
 }

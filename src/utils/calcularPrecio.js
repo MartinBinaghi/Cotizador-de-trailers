@@ -52,3 +52,35 @@ export function calcularPrecio(tipoTrailer, variables = [], redondeo = 1) {
     detalle
   }
 }
+
+/**
+ * Igual que calcularPrecio, pero aplica el multiplicador de "ganancia" de
+ * cada ítem (tipo de trailer y cada variable) a su propio aporte al precio.
+ * Devuelve el costo (calcularPrecio sin modificar) y el valor: el precio
+ * que se cobra al cliente, con margen ya incorporado. `valor` tiene la
+ * misma forma que el retorno de calcularPrecio, para poder usarse en su
+ * lugar donde se guarda/imprime el precio final.
+ *
+ * @param {{precioBase: number, ganancia?: number}} tipoTrailer
+ * @param {Array<{id: number, valor: number, ganancia?: number}>} variables
+ * @param {number} redondeo
+ * @returns {{ costo: object, valor: { base: number, precioFinal: number, detalle: Array } }}
+ */
+export function calcularPrecioConGanancia(tipoTrailer, variables = [], redondeo = 1) {
+  const costo = calcularPrecio(tipoTrailer, variables, redondeo)
+
+  const gananciaTipo = Number(tipoTrailer?.ganancia) || 1
+  const baseValor = costo.base * gananciaTipo
+
+  const mapaGanancia = new Map(variables.map(v => [v.id, Number(v.ganancia) || 1]))
+  const detalleValor = costo.detalle.map(item => ({
+    ...item,
+    monto: item.monto * (mapaGanancia.get(item.id) || 1)
+  }))
+
+  const precioFinalRaw = baseValor + detalleValor.reduce((acc, d) => acc + d.monto, 0)
+  const mult = redondeo && redondeo > 1 ? redondeo : 1
+  const precioFinal = Math.round(precioFinalRaw / mult) * mult
+
+  return { costo, valor: { base: baseValor, precioFinal, detalle: detalleValor } }
+}

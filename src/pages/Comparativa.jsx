@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, getRedondeo } from '../db/database'
-import { calcularPrecio } from '../utils/calcularPrecio'
+import { calcularPrecioConGanancia } from '../utils/calcularPrecio'
 import { generarPdfComparativa } from '../utils/generarPdf'
 import { formatoARS, NOTA_IVA } from '../utils/formato'
 import { variablesDesdeSeleccion } from '../utils/seleccionVariables'
@@ -71,7 +71,7 @@ export default function Comparativa() {
     return modelos.map(m => {
       const tipoTrailer = tipos.find(t => t.id === Number(m.tipoTrailerId))
       const variablesSeleccionadas = variablesDesdeSeleccion(variables, m.seleccionadas)
-      const resultado = tipoTrailer ? calcularPrecio(tipoTrailer, variablesSeleccionadas, redondeo) : null
+      const resultado = tipoTrailer ? calcularPrecioConGanancia(tipoTrailer, variablesSeleccionadas, redondeo).valor : null
       const totalOpcionales = resultado
         ? resultado.detalle.filter(d => d.esOpcional).reduce((acc, d) => acc + d.monto, 0)
         : 0

@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/database'
-import { calcularPrecio } from '../utils/calcularPrecio'
+import { calcularPrecioConGanancia } from '../utils/calcularPrecio'
 import { generarPdfCotizacion } from '../utils/generarPdf'
 import { formatoARS, NOTA_IVA } from '../utils/formato'
 import { normalizarSeleccionadas, variablesDesdeSeleccion } from '../utils/seleccionVariables'
@@ -72,7 +72,7 @@ export default function Historial({ onDuplicar }) {
       return
     }
     // Recalcula con el precio ya guardado como referencia, sin volver a aplicar redondeo actual
-    const resultado = calcularPrecio(tipoTrailer, variablesSeleccionadas, 1)
+    const { valor: resultado } = calcularPrecioConGanancia(tipoTrailer, variablesSeleccionadas, 1)
     resultado.precioFinal = c.precioFinal // respeta el precio histórico exacto
     await generarPdfCotizacion({
       cliente: c.cliente,

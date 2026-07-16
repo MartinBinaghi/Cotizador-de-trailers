@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, getRedondeo } from '../db/database'
-import { calcularPrecio } from '../utils/calcularPrecio'
+import { calcularPrecioConGanancia } from '../utils/calcularPrecio'
 import { generarPdfCotizacion } from '../utils/generarPdf'
 import { formatoARS, NOTA_IVA } from '../utils/formato'
 import { normalizarSeleccionadas, serializarSeleccionadas, variablesDesdeSeleccion } from '../utils/seleccionVariables'
@@ -55,8 +55,8 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales }) 
     [variables, seleccionadas]
   )
 
-  const resultado = useMemo(
-    () => (tipoTrailer ? calcularPrecio(tipoTrailer, variablesSeleccionadas, redondeo) : null),
+  const { costo, valor: resultado } = useMemo(
+    () => (tipoTrailer ? calcularPrecioConGanancia(tipoTrailer, variablesSeleccionadas, redondeo) : { costo: null, valor: null }),
     [tipoTrailer, variablesSeleccionadas, redondeo]
   )
 
@@ -66,6 +66,9 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales }) 
   const precioEstandar = resultado
     ? resultado.base + resultado.detalle.filter(d => !d.esOpcional).reduce((acc, d) => acc + d.monto, 0)
     : 0
+
+  const margenGanancia = costo && resultado ? resultado.precioFinal - costo.precioFinal : 0
+  const margenGananciaPct = costo && costo.precioFinal > 0 ? (margenGanancia / costo.precioFinal) * 100 : 0
 
   function toggleVariable(id) {
     setSeleccionadas(prev => {
@@ -203,6 +206,24 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales }) 
           </div>
         </div>
       </div>
+
+      {resultado && costo && (
+        <div className="resumen-ganancia">
+          <p className="texto-ayuda">Solo visible para vos — no aparece en el PDF</p>
+          <div className="linea-precio">
+            <span>Costo total</span>
+            <span className="price-num">{formatoARS.format(costo.precioFinal)}</span>
+          </div>
+          <div className="linea-precio">
+            <span>Valor total</span>
+            <span className="price-num">{formatoARS.format(resultado.precioFinal)}</span>
+          </div>
+          <div className="linea-precio">
+            <span>Margen de ganancia</span>
+            <span className="price-num">{formatoARS.format(margenGanancia)} ({margenGananciaPct.toFixed(1)}%)</span>
+          </div>
+        </div>
+      )}
 
       {resultado && (
         <div className="resultado">

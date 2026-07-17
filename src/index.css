@@ -101,6 +101,22 @@ input, select, button {
   font-size: 1rem;
 }
 
+input[type="file"]::file-selector-button {
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 0.4rem 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-right: 0.75rem;
+  font-family: inherit;
+}
+
+input[type="file"]::file-selector-button:hover {
+  background: var(--line);
+}
+
 .price-num {
   font-family: ui-monospace, "Cascadia Code", "SFMono-Regular", Consolas, monospace;
   font-variant-numeric: tabular-nums;

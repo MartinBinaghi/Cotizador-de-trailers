@@ -88,30 +88,33 @@ export default function Historial({ onDuplicar }) {
     <div className="page">
       <h2 className="titulo-pagina">Historial de cotizaciones</h2>
 
-      <div className="form-inline">
-        <input
-          placeholder="Buscar por cliente..."
-          value={busqueda}
-          onChange={e => setBusqueda(e.target.value)}
-        />
-        <label className="filtro-fecha">
-          Desde
-          <input type="date" value={desde} onChange={e => setDesde(e.target.value)} />
-        </label>
-        <label className="filtro-fecha">
-          Hasta
-          <input type="date" value={hasta} onChange={e => setHasta(e.target.value)} />
-        </label>
+      <div className="form-card">
+        <div className="form-inline">
+          <input
+            placeholder="Buscar por cliente..."
+            value={busqueda}
+            onChange={e => setBusqueda(e.target.value)}
+          />
+          <label className="filtro-fecha">
+            Desde
+            <input type="date" value={desde} onChange={e => setDesde(e.target.value)} />
+          </label>
+          <label className="filtro-fecha">
+            Hasta
+            <input type="date" value={hasta} onChange={e => setHasta(e.target.value)} />
+          </label>
+        </div>
       </div>
 
       {cotizacionesFiltradas.length === 0 && <p>No hay cotizaciones que coincidan con la búsqueda.</p>}
 
       <ul className="lista-admin">
         {cotizacionesFiltradas.map(c => (
-          <li key={c.id}>
-            <span>
-              {new Date(c.fecha).toLocaleString('es-AR')} — {textoCliente(c)} — {nombreTipo(c.tipoTrailerId)} — <strong className="price-num">{formatoARS.format(c.precioFinal)}</strong> <span className="nota-iva">{NOTA_IVA}</span>
-            </span>
+          <li className="fila-historial" key={c.id}>
+            <span className="historial-fecha">{new Date(c.fecha).toLocaleString('es-AR')}</span>
+            <span className="historial-cliente">{textoCliente(c)}</span>
+            <span className="historial-tipo">{nombreTipo(c.tipoTrailerId)}</span>
+            <strong className="price-num">{formatoARS.format(c.precioFinal)} <span className="nota-iva">{NOTA_IVA}</span></strong>
             <span className="acciones">
               <button className="btn-secundario" onClick={() => duplicar(c)}>Duplicar</button>
               <button className="btn-secundario" onClick={() => descargarPdf(c)}>PDF</button>

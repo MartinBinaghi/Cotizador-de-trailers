@@ -142,6 +142,7 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales }) 
     <div className="page">
       <h2 className="titulo-pagina">Nueva cotización</h2>
 
+      <div className="cotizador-layout">
       <div className="form-card">
         <div className="grupo-campo">
           <span className="grupo-titulo">Datos del cliente</span>
@@ -207,6 +208,7 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales }) 
         </div>
       </div>
 
+      <aside className="panel-lateral">
       {resultado && costo && (
         <div className="resumen-ganancia">
           <p className="texto-ayuda">Solo visible para vos — no aparece en el PDF</p>
@@ -250,6 +252,11 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales }) 
           </div>
         </div>
       )}
+      {!resultado && (
+        <div className="panel-vacio">Elegí un tipo de trailer para ver el precio.</div>
+      )}
+      </aside>
+      </div>
     </div>
   )
 }

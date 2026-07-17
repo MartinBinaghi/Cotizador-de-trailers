@@ -8,11 +8,13 @@ export default function Admin() {
   return (
     <div className="page">
       <h2 className="titulo-pagina">Administrar catálogo</h2>
-      <ConfigRedondeo />
-      <AjustePreciosMasivo />
-      <AdminTiposTrailer />
-      <AdminVariables />
-      <BackupRestore />
+      <div className="admin-grid">
+        <ConfigRedondeo />
+        <BackupRestore />
+        <AjustePreciosMasivo />
+        <AdminTiposTrailer />
+        <AdminVariables />
+      </div>
     </div>
   )
 }
@@ -89,7 +91,7 @@ function AjustePreciosMasivo() {
   }
 
   return (
-    <section className="admin-seccion">
+    <section className="admin-seccion admin-seccion-ancha">
       <h3>Ajuste masivo de precios</h3>
       <p className="texto-ayuda">
         Aumenta o disminuye de una sola vez el precio base y el valor fijo ($)
@@ -228,7 +230,7 @@ function AdminTiposTrailer() {
   }
 
   return (
-    <section className="admin-seccion">
+    <section className="admin-seccion admin-seccion-ancha">
       <h3>Tipos de trailer</h3>
       <ul className="lista-admin">
         {tipos.map(t => (
@@ -394,7 +396,7 @@ function AdminVariables() {
   }
 
   return (
-    <section className="admin-seccion">
+    <section className="admin-seccion admin-seccion-ancha">
       <h3>Variables (frenos, homologación, etc.)</h3>
       <input
         className="buscador-variables"

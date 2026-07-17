@@ -15,8 +15,8 @@ export default defineConfig({
         name: 'Cotizador de Trailers',
         short_name: 'Cotizador',
         description: 'App para cotizar trailers según tipo y variables configurables',
-        theme_color: '#1e293b',
-        background_color: '#0f172a',
+        theme_color: '#0A0908',
+        background_color: '#F6F4EE',
         display: 'standalone',
         start_url: '/',
         icons: [

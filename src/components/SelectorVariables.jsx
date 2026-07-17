@@ -43,6 +43,7 @@ export default function SelectorVariables({ variables, seleccionadas, onToggle, 
         <p className="texto-ayuda">Sin resultados para "{busqueda}".</p>
       )}
 
+      <div className="grupos-variables">
       {categorias.map(cat => (
         <fieldset key={cat} className="grupo-variables">
           <legend>{cat}</legend>
@@ -79,6 +80,7 @@ export default function SelectorVariables({ variables, seleccionadas, onToggle, 
           })}
         </fieldset>
       ))}
+      </div>
     </div>
   )
 }

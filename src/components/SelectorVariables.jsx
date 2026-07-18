@@ -65,7 +65,7 @@ export default function SelectorVariables({ variables, seleccionadas, onToggle, 
                       : `${v.valor >= 0 ? '+' : ''}${v.valor}%`}
                   </span>
                 </label>
-                {estaSeleccionada && v.permiteCantidad && (
+                {estaSeleccionada && v.permiteCantidad && v.tipoModificador === 'fijo' && (
                   <input
                     type="number"
                     min="1"

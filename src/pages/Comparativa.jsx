@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, getRedondeo } from '../db/database'
-import { calcularPrecioConGanancia } from '../utils/calcularPrecio'
+import { calcularPrecioConGanancia, desglosarEstandarYOpcionales } from '../utils/calcularPrecio'
 import { generarPdfComparativa } from '../utils/generarPdf'
 import { formatoARS, NOTA_IVA } from '../utils/formato'
 import { variablesDesdeSeleccion } from '../utils/seleccionVariables'
@@ -72,12 +72,9 @@ export default function Comparativa() {
       const tipoTrailer = tipos.find(t => t.id === Number(m.tipoTrailerId))
       const variablesSeleccionadas = variablesDesdeSeleccion(variables, m.seleccionadas)
       const resultado = tipoTrailer ? calcularPrecioConGanancia(tipoTrailer, variablesSeleccionadas, redondeo).valor : null
-      const totalOpcionales = resultado
-        ? resultado.detalle.filter(d => d.esOpcional).reduce((acc, d) => acc + d.monto, 0)
-        : 0
-      const precioEstandar = resultado
-        ? resultado.base + resultado.detalle.filter(d => !d.esOpcional).reduce((acc, d) => acc + d.monto, 0)
-        : 0
+      const { precioEstandar, totalOpcionales } = resultado
+        ? desglosarEstandarYOpcionales(resultado)
+        : { precioEstandar: 0, totalOpcionales: 0 }
       return { modelo: m, tipoTrailer, variablesSeleccionadas, resultado, precioEstandar, totalOpcionales }
     })
   }, [modelos, tipos, variables, redondeo])
@@ -102,14 +99,16 @@ export default function Comparativa() {
       return
     }
     const columnas = modelosValidos.map(f => {
+      // Indexado por id (no por nombre) para que dos variables con el mismo
+      // nombre en categorías distintas no se pisen entre sí.
       const valoresVariables = {}
       for (const v of variablesEnUso) {
         const seleccionada = f.variablesSeleccionadas.find(sv => sv.id === v.id)
         if (v.esOpcional) {
           const detalleItem = f.resultado.detalle.find(d => d.id === v.id)
-          valoresVariables[v.nombre] = detalleItem ? formatoARS.format(detalleItem.monto) : '—'
+          valoresVariables[v.id] = detalleItem ? formatoARS.format(detalleItem.monto) : '—'
         } else {
-          valoresVariables[v.nombre] = seleccionada
+          valoresVariables[v.id] = seleccionada
             ? (seleccionada.cantidad > 1 ? `Sí (x${seleccionada.cantidad})` : 'Sí')
             : '—'
         }
@@ -125,7 +124,7 @@ export default function Comparativa() {
     })
     await generarPdfComparativa({
       fecha: new Date().toISOString(),
-      variablesInfo: variablesEnUso.map(v => ({ nombre: v.nombre, esOpcional: !!v.esOpcional })),
+      variablesInfo: variablesEnUso.map(v => ({ id: v.id, nombre: v.nombre, esOpcional: !!v.esOpcional })),
       columnas
     })
   }

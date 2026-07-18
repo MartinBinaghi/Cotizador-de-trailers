@@ -7,6 +7,14 @@ import { formatoARS, NOTA_IVA } from '../utils/formato'
 import { normalizarSeleccionadas, variablesDesdeSeleccion } from '../utils/seleccionVariables'
 import { useToast } from '../components/Toast'
 
+// Fecha local (no UTC) en formato YYYY-MM-DD, para que el filtro coincida
+// con la fecha que se muestra en la lista (toLocaleString).
+function fechaLocalISO(fechaIso) {
+  const fecha = new Date(fechaIso)
+  const pad = n => String(n).padStart(2, '0')
+  return `${fecha.getFullYear()}-${pad(fecha.getMonth() + 1)}-${pad(fecha.getDate())}`
+}
+
 export default function Historial({ onDuplicar }) {
   const showToast = useToast()
   const cotizaciones = useLiveQuery(
@@ -39,7 +47,7 @@ export default function Historial({ onDuplicar }) {
         )
         if (!coincide) return false
       }
-      const fechaC = c.fecha?.slice(0, 10)
+      const fechaC = c.fecha ? fechaLocalISO(c.fecha) : ''
       if (desde && fechaC < desde) return false
       if (hasta && fechaC > hasta) return false
       return true
@@ -64,6 +72,22 @@ export default function Historial({ onDuplicar }) {
   }
 
   async function descargarPdf(c) {
+    if (c.snapshot) {
+      // Cotizaciones con snapshot: el PDF sale del desglose guardado al
+      // cotizar, inmune a cambios o bajas posteriores en el catálogo.
+      await generarPdfCotizacion({
+        cliente: c.cliente,
+        fecha: c.fecha,
+        tipoTrailerNombre: c.snapshot.tipoTrailerNombre,
+        variables: c.snapshot.detalle,
+        resultado: { base: c.snapshot.base, precioFinal: c.precioFinal, detalle: c.snapshot.detalle },
+        imagenes: c.imagenes || []
+      })
+      return
+    }
+
+    // Cotizaciones viejas sin snapshot: se recalcula con el catálogo actual
+    // (los montos por línea pueden diferir del total histórico).
     const tipoTrailer = tipos.find(t => t.id === c.tipoTrailerId)
     const mapaSeleccion = normalizarSeleccionadas(c.variablesSeleccionadas)
     const variablesSeleccionadas = variablesDesdeSeleccion(variables, mapaSeleccion)

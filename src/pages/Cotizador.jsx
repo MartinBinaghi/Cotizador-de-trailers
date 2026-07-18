@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, getRedondeo, setRedondeo } from '../db/database'
-import { calcularPrecioConGanancia } from '../utils/calcularPrecio'
+import { calcularPrecioConGanancia, desglosarEstandarYOpcionales } from '../utils/calcularPrecio'
 import { generarPdfCotizacion } from '../utils/generarPdf'
 import { formatoARS, NOTA_IVA } from '../utils/formato'
 import { normalizarSeleccionadas, serializarSeleccionadas, variablesDesdeSeleccion } from '../utils/seleccionVariables'
@@ -29,10 +29,45 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales }) 
   const [cuit, setCuit] = useState('')
   const [imagenes, setImagenes] = useState([])
   const [redondeo, setRedondeoLocal] = useState(1)
+  const [guardando, setGuardando] = useState(false)
+  const [borradorListo, setBorradorListo] = useState(false)
 
   useEffect(() => {
     getRedondeo().then(setRedondeoLocal)
   }, [])
+
+  // Restaura el borrador guardado al montar, para no perder el formulario al
+  // recargar o cerrar la app. Si se está duplicando una cotización, esos
+  // datos tienen prioridad y pisan el borrador.
+  useEffect(() => {
+    if (datosIniciales) {
+      setBorradorListo(true)
+      return
+    }
+    db.config.get('borradorCotizador')
+      .then(registro => {
+        const borrador = registro?.valor
+        if (borrador) {
+          setTipoTrailerId(borrador.tipoTrailerId ?? '')
+          setSeleccionadas(borrador.seleccionadas ?? {})
+          setNombreCliente(borrador.nombreCliente ?? '')
+          setRazonSocial(borrador.razonSocial ?? '')
+          setCuit(borrador.cuit ?? '')
+          setImagenes(borrador.imagenes ?? [])
+        }
+      })
+      .finally(() => setBorradorListo(true))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Persiste el borrador ante cualquier cambio del formulario
+  useEffect(() => {
+    if (!borradorListo) return
+    db.config.put({
+      clave: 'borradorCotizador',
+      valor: { tipoTrailerId, seleccionadas, nombreCliente, razonSocial, cuit, imagenes }
+    })
+  }, [borradorListo, tipoTrailerId, seleccionadas, nombreCliente, razonSocial, cuit, imagenes])
 
   // Si llegan datos para duplicar una cotización anterior, los precarga una sola vez
   useEffect(() => {
@@ -60,12 +95,9 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales }) 
     [tipoTrailer, variablesSeleccionadas, redondeo]
   )
 
-  const totalOpcionales = resultado
-    ? resultado.detalle.filter(d => d.esOpcional).reduce((acc, d) => acc + d.monto, 0)
-    : 0
-  const precioEstandar = resultado
-    ? resultado.base + resultado.detalle.filter(d => !d.esOpcional).reduce((acc, d) => acc + d.monto, 0)
-    : 0
+  const { precioEstandar, totalOpcionales } = resultado
+    ? desglosarEstandarYOpcionales(resultado)
+    : { precioEstandar: 0, totalOpcionales: 0 }
 
   const margenGanancia = costo && resultado ? resultado.precioFinal - costo.precioFinal : 0
   const margenGananciaPct = costo && costo.precioFinal > 0 ? (margenGanancia / costo.precioFinal) * 100 : 0
@@ -118,15 +150,28 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales }) 
       showToast('Elegí un tipo de trailer antes de guardar', 'error')
       return
     }
-    await db.cotizaciones.add({
-      tipoTrailerId: tipoTrailer.id,
-      variablesSeleccionadas: serializarSeleccionadas(seleccionadas),
-      precioFinal: resultado.precioFinal,
-      cliente: { nombreCliente: nombreCliente.trim(), razonSocial: razonSocial.trim(), cuit: cuit.trim() },
-      imagenes,
-      fecha: new Date().toISOString()
-    })
-    showToast('Cotización guardada')
+    setGuardando(true)
+    try {
+      await db.cotizaciones.add({
+        tipoTrailerId: tipoTrailer.id,
+        variablesSeleccionadas: serializarSeleccionadas(seleccionadas),
+        precioFinal: resultado.precioFinal,
+        cliente: { nombreCliente: nombreCliente.trim(), razonSocial: razonSocial.trim(), cuit: cuit.trim() },
+        imagenes,
+        fecha: new Date().toISOString(),
+        // Snapshot del desglose al momento de cotizar: el PDF histórico se
+        // dibuja desde acá y no cambia aunque después cambien los precios
+        // del catálogo o se eliminen variables.
+        snapshot: {
+          tipoTrailerNombre: tipoTrailer.nombre,
+          base: resultado.base,
+          detalle: resultado.detalle.map(d => ({ ...d, cantidad: seleccionadas[d.id] ?? 1 }))
+        }
+      })
+      showToast('Cotización guardada')
+    } finally {
+      setGuardando(false)
+    }
   }
 
   async function descargarPdf() {
@@ -272,7 +317,9 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales }) 
             </span>
           </div>
           <div className="acciones-resultado">
-            <button onClick={guardarCotizacion}>Guardar cotización</button>
+            <button onClick={guardarCotizacion} disabled={guardando}>
+              {guardando ? 'Guardando...' : 'Guardar cotización'}
+            </button>
             <button className="btn-secundario" onClick={descargarPdf}>Descargar PDF</button>
           </div>
         </div>

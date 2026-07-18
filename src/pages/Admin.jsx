@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, exportarBackup, analizarBackup, combinarBackup, getRedondeo, setRedondeo, actualizarPreciosPorcentaje } from '../db/database'
+import { db, exportarBackup, analizarBackup, combinarBackup, actualizarPreciosPorcentaje } from '../db/database'
 import { validarTipoTrailer, validarVariable } from '../utils/validaciones'
 import { useToast } from '../components/Toast'
 
@@ -8,11 +8,12 @@ export default function Admin() {
   return (
     <div className="page">
       <h2 className="titulo-pagina">Administrar catálogo</h2>
-      <ConfigRedondeo />
-      <AjustePreciosMasivo />
-      <AdminTiposTrailer />
-      <AdminVariables />
-      <BackupRestore />
+      <div className="admin-grid">
+        <BackupRestore />
+        <AjustePreciosMasivo />
+        <AdminTiposTrailer />
+        <AdminVariables />
+      </div>
     </div>
   )
 }
@@ -89,7 +90,7 @@ function AjustePreciosMasivo() {
   }
 
   return (
-    <section className="admin-seccion">
+    <section className="admin-seccion admin-seccion-ancha">
       <h3>Ajuste masivo de precios</h3>
       <p className="texto-ayuda">
         Aumenta o disminuye de una sola vez el precio base y el valor fijo ($)
@@ -151,34 +152,6 @@ function AjustePreciosMasivo() {
   )
 }
 
-function ConfigRedondeo() {
-  const showToast = useToast()
-  const [redondeo, setRedondeoLocal] = useState(1)
-
-  useEffect(() => {
-    getRedondeo().then(setRedondeoLocal)
-  }, [])
-
-  async function cambiar(e) {
-    const valor = Number(e.target.value)
-    setRedondeoLocal(valor)
-    await setRedondeo(valor)
-    showToast('Preferencia de redondeo guardada')
-  }
-
-  return (
-    <section className="admin-seccion">
-      <h3>Redondeo del precio final</h3>
-      <select value={redondeo} onChange={cambiar}>
-        <option value={1}>Sin redondeo</option>
-        <option value={100}>Redondear a $100</option>
-        <option value={1000}>Redondear a $1.000</option>
-        <option value={10000}>Redondear a $10.000</option>
-      </select>
-    </section>
-  )
-}
-
 function AdminTiposTrailer() {
   const tipos = useLiveQuery(() => db.tiposTrailer.toArray(), []) ?? []
   const showToast = useToast()
@@ -228,11 +201,11 @@ function AdminTiposTrailer() {
   }
 
   return (
-    <section className="admin-seccion">
+    <section className="admin-seccion admin-seccion-ancha">
       <h3>Tipos de trailer</h3>
       <ul className="lista-admin">
         {tipos.map(t => (
-          <li key={t.id}>
+          <li className={editandoId === t.id ? '' : 'fila-tipo'} key={t.id}>
             {editandoId === t.id ? (
               <div className="form-inline">
                 <input value={editNombre} onChange={e => setEditNombre(e.target.value)} />
@@ -243,7 +216,9 @@ function AdminTiposTrailer() {
               </div>
             ) : (
               <>
-                <span>{t.nombre} — ${t.precioBase.toLocaleString('es-AR')} — ×{t.ganancia ?? 1}</span>
+                <span>{t.nombre}</span>
+                <span className="price-num var-valor">${t.precioBase.toLocaleString('es-AR')}</span>
+                <span className="var-ganancia">×{t.ganancia ?? 1}</span>
                 <span className="acciones">
                   <button className="btn-secundario" onClick={() => empezarEdicion(t)}>Editar</button>
                   <button className="btn-peligro" onClick={() => eliminar(t.id)}>Eliminar</button>
@@ -394,7 +369,7 @@ function AdminVariables() {
   }
 
   return (
-    <section className="admin-seccion">
+    <section className="admin-seccion admin-seccion-ancha">
       <h3>Variables (frenos, homologación, etc.)</h3>
       <input
         className="buscador-variables"
@@ -407,7 +382,7 @@ function AdminVariables() {
       )}
       <ul className="lista-admin">
         {variablesOrdenadas.map(v => (
-          <li key={v.id}>
+          <li className={editandoId === v.id ? '' : 'fila-variable'} key={v.id}>
             {editandoId === v.id ? (
               <div className="form-inline">
                 <select value={editVar.categoria} onChange={e => setEditVar({ ...editVar, categoria: e.target.value })}>
@@ -450,11 +425,16 @@ function AdminVariables() {
               </div>
             ) : (
               <>
+                <span className="var-categoria">{v.categoria}</span>
                 <span>
-                  [{v.categoria}] {v.nombre} — {v.tipoModificador === 'fijo' ? `$${v.valor.toLocaleString('es-AR')}` : `${v.valor >= 0 ? '+' : ''}${v.valor}%`} — ×{v.ganancia ?? 1}
-                  {v.permiteCantidad && <span className="etiqueta-cantidad"> (admite cantidad)</span>}
-                  {v.esOpcional && <span className="etiqueta-opcional"> (opcional)</span>}
+                  {v.nombre}
+                  {v.permiteCantidad && <span className="etiqueta-cantidad">admite cantidad</span>}
+                  {v.esOpcional && <span className="etiqueta-opcional">opcional</span>}
                 </span>
+                <span className="price-num var-valor">
+                  {v.tipoModificador === 'fijo' ? `$${v.valor.toLocaleString('es-AR')}` : `${v.valor >= 0 ? '+' : ''}${v.valor}%`}
+                </span>
+                <span className="var-ganancia">×{v.ganancia ?? 1}</span>
                 <span className="acciones">
                   <button className="btn-secundario" onClick={() => empezarEdicion(v)}>Editar</button>
                   <button className="btn-peligro" onClick={() => eliminar(v.id)}>Eliminar</button>
@@ -618,7 +598,7 @@ function BackupRestore() {
   }
 
   return (
-    <section className="admin-seccion">
+    <section className="admin-seccion admin-seccion-ancha">
       <h3>Backup y restauración</h3>
       <p className="texto-ayuda">
         Como todos los datos viven en esta computadora, se recomienda exportar
@@ -628,7 +608,7 @@ function BackupRestore() {
       </p>
       <div className="form-inline">
         <button onClick={exportar}>Descargar backup (JSON)</button>
-        <button className="btn-secundario" onClick={elegirArchivo}>Combinar con backup</button>
+        <button className="btn-secundario" onClick={elegirArchivo}>Actualizar con backup</button>
         <input
           type="file"
           accept="application/json"

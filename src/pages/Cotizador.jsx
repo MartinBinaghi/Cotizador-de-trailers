@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, getRedondeo } from '../db/database'
+import { db, getRedondeo, setRedondeo } from '../db/database'
 import { calcularPrecioConGanancia } from '../utils/calcularPrecio'
 import { generarPdfCotizacion } from '../utils/generarPdf'
 import { formatoARS, NOTA_IVA } from '../utils/formato'
@@ -107,6 +107,12 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales }) 
     setImagenes(prev => prev.filter((_, i) => i !== index))
   }
 
+  async function cambiarRedondeo(valor) {
+    const redondeoNuevo = Number(valor)
+    setRedondeoLocal(redondeoNuevo)
+    await setRedondeo(redondeoNuevo)
+  }
+
   async function guardarCotizacion() {
     if (!tipoTrailer || !resultado) {
       showToast('Elegí un tipo de trailer antes de guardar', 'error')
@@ -142,6 +148,7 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales }) 
     <div className="page">
       <h2 className="titulo-pagina">Nueva cotización</h2>
 
+      <div className="cotizador-layout">
       <div className="form-card">
         <div className="grupo-campo">
           <span className="grupo-titulo">Datos del cliente</span>
@@ -198,7 +205,15 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales }) 
                 {imagenes.map((src, i) => (
                   <div className="miniatura-imagen" key={i}>
                     <img src={src} alt={`Imagen ${i + 1}`} />
-                    <button type="button" className="btn-peligro" onClick={() => quitarImagen(i)}>Quitar</button>
+                    <button
+                      type="button"
+                      className="btn-quitar-imagen"
+                      onClick={() => quitarImagen(i)}
+                      aria-label={`Quitar imagen ${i + 1}`}
+                      title="Quitar imagen"
+                    >
+                      ×
+                    </button>
                   </div>
                 ))}
               </div>
@@ -207,6 +222,7 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales }) 
         </div>
       </div>
 
+      <aside className="panel-lateral">
       {resultado && costo && (
         <div className="resumen-ganancia">
           <p className="texto-ayuda">Solo visible para vos — no aparece en el PDF</p>
@@ -227,6 +243,17 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales }) 
 
       {resultado && (
         <div className="resultado">
+          <div className="resultado-header-config">
+            <label className="selector-redondeo">
+              Redondeo
+              <select value={redondeo} onChange={e => cambiarRedondeo(e.target.value)}>
+                <option value={1}>Sin redondeo</option>
+                <option value={100}>$100</option>
+                <option value={1000}>$1.000</option>
+                <option value={10000}>$10.000</option>
+              </select>
+            </label>
+          </div>
           <div className="linea-precio">
             <span>Precio estándar</span>
             <span className="price-num">{formatoARS.format(precioEstandar)}</span>
@@ -250,6 +277,11 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales }) 
           </div>
         </div>
       )}
+      {!resultado && (
+        <div className="panel-vacio">Elegí un tipo de trailer para ver el precio.</div>
+      )}
+      </aside>
+      </div>
     </div>
   )
 }

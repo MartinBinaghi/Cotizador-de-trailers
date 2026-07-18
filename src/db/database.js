@@ -69,6 +69,28 @@ db.version(4).stores({
   })
 })
 
+// v5: las categorías ganan el flag booleano `esDescuento` (no indexado), que
+// reemplaza a la heurística de "el nombre contiene 'descuento'". Las
+// existentes se migran una única vez con esa misma heurística.
+db.version(5).stores({
+  tiposTrailer: '++id, nombre, precioBase',
+  categorias: '++id, &nombre',
+  variables: '++id, categoria, nombre, tipoModificador, valor, aplicaSobre',
+  cotizaciones: '++id, tipoTrailerId, fecha, precioFinal',
+  config: 'clave'
+}).upgrade(async tx => {
+  await tx.table('categorias').toCollection().modify(cat => {
+    if (cat.esDescuento === undefined) {
+      cat.esDescuento = esNombreDescuento(cat.nombre)
+    }
+  })
+})
+
+/** Heurística usada SOLO para migrar/importar datos que no traen el flag esDescuento. */
+function esNombreDescuento(nombre) {
+  return String(nombre ?? '').toLowerCase().includes('descuento')
+}
+
 // --- Backup / restore ---
 
 /** Exporta toda la base a un objeto plano, listo para JSON.stringify */
@@ -140,8 +162,9 @@ export async function analizarBackup(data) {
   ])
 
   const categoriasBackup = Array.isArray(data.categorias) && data.categorias.length > 0
-    ? data.categorias
-    : [...new Set(data.variables.map(v => v.categoria).filter(Boolean))].map(nombre => ({ nombre }))
+    ? data.categorias.map(c => ({ esDescuento: esNombreDescuento(c.nombre), ...c }))
+    : [...new Set(data.variables.map(v => v.categoria).filter(Boolean))]
+        .map(nombre => ({ nombre, esDescuento: esNombreDescuento(nombre) }))
 
   return {
     tiposTrailer: separarNuevosYDuplicados(data.tiposTrailer, tiposTrailerLocal, claveTipoTrailer),
@@ -346,7 +369,9 @@ async function ensureCategoriasSeeded() {
     ? nombres
     : ['Frenos', 'Homologación', 'Ejes', 'Descuentos']
 
-  await db.categorias.bulkAdd(categoriasFinales.map(nombre => ({ nombre })))
+  await db.categorias.bulkAdd(
+    categoriasFinales.map(nombre => ({ nombre, esDescuento: esNombreDescuento(nombre) }))
+  )
 }
 
 
@@ -371,10 +396,10 @@ export async function seedIfEmpty() {
     ])
 
     await db.categorias.bulkAdd([
-      { nombre: 'Frenos' },
-      { nombre: 'Homologación' },
-      { nombre: 'Ejes' },
-      { nombre: 'Descuentos' }
+      { nombre: 'Frenos', esDescuento: false },
+      { nombre: 'Homologación', esDescuento: false },
+      { nombre: 'Ejes', esDescuento: false },
+      { nombre: 'Descuentos', esDescuento: true }
     ])
 
     await db.variables.bulkAdd([

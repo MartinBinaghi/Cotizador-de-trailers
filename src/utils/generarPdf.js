@@ -1,4 +1,5 @@
 import { formatoARS, NOTA_IVA } from './formato'
+import { desglosarEstandarYOpcionales } from './calcularPrecio'
 import logoUrl from '../../BINA MAQUINARIAS LOGO_2026_Mesa de trabajo 1 copia.png'
 
 // Paleta consistente con la UI (App.css): header oscuro, acento celeste, grises slate.
@@ -211,8 +212,7 @@ export async function generarPdfCotizacion(datos) {
   const cuit = cliente?.cuit?.trim() || ''
   const variablesEstandar = variables.filter(v => !v.esOpcional)
   const variablesOpcionales = variables.filter(v => v.esOpcional)
-  const totalOpcionales = variablesOpcionales.reduce((acc, v) => acc + montoVariable(v, resultado), 0)
-  const precioEstandar = resultado.base + variablesEstandar.reduce((acc, v) => acc + montoVariable(v, resultado), 0)
+  const { precioEstandar, totalOpcionales } = desglosarEstandarYOpcionales(resultado)
   const doc = new jsPDF()
   const anchoPagina = doc.internal.pageSize.getWidth()
   const altoPagina = doc.internal.pageSize.getHeight()
@@ -314,7 +314,11 @@ export async function generarPdfCotizacion(datos) {
 
   dibujarPiePagina(doc, fecha)
 
-  const slugCliente = (cliente?.nombreCliente?.trim() || 'sin-nombre').replace(/\s+/g, '-')
+  // Sin caracteres inválidos para nombres de archivo (Windows: \ / : * ? " < > |)
+  const slugCliente = (cliente?.nombreCliente?.trim() || '')
+    .replace(/[\\/:*?"<>|]/g, '')
+    .trim()
+    .replace(/\s+/g, '-') || 'sin-nombre'
   const nombreArchivo = `cotizacion-${slugCliente}-${formatoFechaArchivo(fecha)}.pdf`
   doc.save(nombreArchivo)
 }
@@ -325,7 +329,7 @@ export async function generarPdfCotizacion(datos) {
  * Las variables opcionales muestran su precio, y se agrega una fila
  * "Total opcionales" por columna para que se vea la diferencia entre el
  * trailer estándar y lo que pidió el cliente.
- * @param {{fecha: string, variablesInfo: Array<{nombre: string, esOpcional: boolean}>, columnas: Array<{nombre: string, tipoTrailerNombre: string, precioEstandar: number, totalOpcionales: number, total: number, valoresVariables: {[nombre: string]: string}}>}} datos
+ * @param {{fecha: string, variablesInfo: Array<{id: number, nombre: string, esOpcional: boolean}>, columnas: Array<{nombre: string, tipoTrailerNombre: string, precioEstandar: number, totalOpcionales: number, total: number, valoresVariables: {[id: number]: string}}>}} datos
  */
 export async function generarPdfComparativa(datos) {
   const { jsPDF } = await import('jspdf')
@@ -345,7 +349,7 @@ export async function generarPdfComparativa(datos) {
   const filas = [
     { etiqueta: 'Tipo de trailer', valor: c => c.tipoTrailerNombre },
     { etiqueta: 'Precio estándar', valor: c => formatoARS.format(c.precioEstandar) },
-    ...variablesInfo.map(vi => ({ etiqueta: vi.nombre, valor: c => c.valoresVariables[vi.nombre] ?? '—' })),
+    ...variablesInfo.map(vi => ({ etiqueta: vi.nombre, valor: c => c.valoresVariables[vi.id] ?? '—' })),
     { etiqueta: 'Total opcionales', valor: c => formatoARS.format(c.totalOpcionales) },
     { etiqueta: 'TOTAL', valor: c => `${formatoARS.format(c.total)} ${NOTA_IVA}`, destacada: true }
   ]

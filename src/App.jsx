@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { seedIfEmpty } from './db/database'
 import { ToastProvider } from './components/Toast'
+import ErrorBoundary from './components/ErrorBoundary'
 import Cotizador from './pages/Cotizador'
 import Admin from './pages/Admin'
 import Historial from './pages/Historial'
@@ -26,7 +27,8 @@ export default function App() {
   const [tema, setTema] = useState(temaInicial)
 
   useEffect(() => {
-    seedIfEmpty()
+    // Datos de ejemplo solo en desarrollo: la app instalada arranca vacía
+    if (import.meta.env.DEV) seedIfEmpty()
   }, [])
 
   useEffect(() => {
@@ -78,15 +80,19 @@ export default function App() {
           </div>
         </header>
         <main>
-          {tab === 'cotizador' && (
-            <Cotizador
-              datosIniciales={datosParaDuplicar}
-              onConsumirDatosIniciales={() => setDatosParaDuplicar(null)}
-            />
-          )}
-          {tab === 'comparativa' && <Comparativa />}
-          {tab === 'admin' && <Admin />}
-          {tab === 'historial' && <Historial onDuplicar={handleDuplicar} />}
+          {/* key={tab}: si una pestaña rompe, cambiar de pestaña resetea el boundary
+              y el resto de la app (header/nav) sigue funcionando */}
+          <ErrorBoundary key={tab}>
+            {tab === 'cotizador' && (
+              <Cotizador
+                datosIniciales={datosParaDuplicar}
+                onConsumirDatosIniciales={() => setDatosParaDuplicar(null)}
+              />
+            )}
+            {tab === 'comparativa' && <Comparativa />}
+            {tab === 'admin' && <Admin />}
+            {tab === 'historial' && <Historial onDuplicar={handleDuplicar} />}
+          </ErrorBoundary>
         </main>
       </div>
     </ToastProvider>

@@ -255,6 +255,7 @@ function AdminVariables() {
   const [error, setError] = useState(null)
   const [mostrarNuevaCategoria, setMostrarNuevaCategoria] = useState(false)
   const [nuevaCategoria, setNuevaCategoria] = useState('')
+  const [nuevaEsDescuento, setNuevaEsDescuento] = useState(false)
   const [busquedaAdmin, setBusquedaAdmin] = useState('')
 
   const [editandoId, setEditandoId] = useState(null)
@@ -276,17 +277,24 @@ function AdminVariables() {
     })
   }, [variables, busquedaAdmin])
 
-  // Función auxiliar para aplicar lógica de descuento
-  function procesarValor(valor, categoriaUsada, tipo) {
+  /** Una categoría es de descuento si su registro tiene el flag esDescuento. */
+  function esCategoriaDescuento(nombreCategoria) {
+    const nombreNormalizado = (nombreCategoria || '').trim().toLowerCase()
+    return categorias.some(
+      c => c.nombre.trim().toLowerCase() === nombreNormalizado && c.esDescuento
+    )
+  }
+
+  // En categorías de descuento, los porcentajes se cargan en positivo y se guardan en negativo
+  function procesarValor(valor, esDescuento, tipo) {
     let val = Number(valor)
-    // Si es categoría que contiene "descuento" (case-insensitive) y es porcentual, invertir el signo
-    if (categoriaUsada?.toLowerCase().includes('descuento') && tipo === 'porcentual' && val > 0) {
+    if (esDescuento && tipo === 'porcentual' && val > 0) {
       val = -val
     }
     return val
   }
 
-  async function asegurarCategoriaExistente(nombreCategoria) {
+  async function asegurarCategoriaExistente(nombreCategoria, esDescuento = false) {
     const categoriaNormalizada = nombreCategoria.trim()
     if (!categoriaNormalizada) return
 
@@ -295,7 +303,7 @@ function AdminVariables() {
     )
 
     if (!yaExiste) {
-      await db.categorias.add({ nombre: categoriaNormalizada })
+      await db.categorias.add({ nombre: categoriaNormalizada, esDescuento })
     }
   }
 
@@ -305,14 +313,15 @@ function AdminVariables() {
       setError('Selecciona o ingresa una categoría')
       return
     }
-    
+
+    const esDescuento = mostrarNuevaCategoria ? nuevaEsDescuento : esCategoriaDescuento(catFinal)
     const datos = { categoria: catFinal, nombre, valor, tipoModificador, ganancia }
-    const err = validarVariable(datos)
+    const err = validarVariable(datos, esDescuento)
     if (err) { setError(err); return }
     setError(null)
 
-    const valorFinal = procesarValor(valor, catFinal, tipoModificador)
-        await asegurarCategoriaExistente(catFinal)
+    const valorFinal = procesarValor(valor, esDescuento, tipoModificador)
+    await asegurarCategoriaExistente(catFinal, esDescuento)
 
     await db.variables.add({
       categoria: catFinal,
@@ -329,6 +338,7 @@ function AdminVariables() {
     setValor('')
     setGanancia('')
     setNuevaCategoria('')
+    setNuevaEsDescuento(false)
     setMostrarNuevaCategoria(false)
     setPermiteCantidad(false)
     setEsOpcional(false)
@@ -343,16 +353,28 @@ function AdminVariables() {
   }
 
   function empezarEdicion(v) {
+    // Solo los descuentos porcentuales se editan en positivo (procesarValor
+    // re-invierte el signo al guardar). El resto muestra su valor tal cual,
+    // para no convertir silenciosamente un valor negativo en positivo.
+    const esDescuentoPorcentual =
+      v.tipoModificador === 'porcentual' && esCategoriaDescuento(v.categoria)
     setEditandoId(v.id)
-    setEditVar({ ...v, valor: String(Math.abs(v.valor)), ganancia: String(v.ganancia ?? 1), permiteCantidad: !!v.permiteCantidad, esOpcional: !!v.esOpcional })
+    setEditVar({
+      ...v,
+      valor: String(esDescuentoPorcentual ? Math.abs(v.valor) : v.valor),
+      ganancia: String(v.ganancia ?? 1),
+      permiteCantidad: !!v.permiteCantidad,
+      esOpcional: !!v.esOpcional
+    })
   }
 
   async function guardarEdicion(id) {
-    const err = validarVariable(editVar)
+    const esDescuento = esCategoriaDescuento(editVar.categoria)
+    const err = validarVariable(editVar, esDescuento)
     if (err) { showToast(err, 'error'); return }
 
-    const valorFinal = procesarValor(editVar.valor, editVar.categoria, editVar.tipoModificador)
-    await asegurarCategoriaExistente(editVar.categoria)
+    const valorFinal = procesarValor(editVar.valor, esDescuento, editVar.tipoModificador)
+    await asegurarCategoriaExistente(editVar.categoria, esDescuento)
 
     await db.variables.update(id, {
       categoria: editVar.categoria.trim(),
@@ -397,7 +419,9 @@ function AdminVariables() {
                   <option value="porcentual">Porcentaje (%)</option>
                 </select>
                 <input type="number" value={editVar.valor} onChange={e => setEditVar({ ...editVar, valor: e.target.value })} />
-                <input type="number" step="0.1" placeholder="Ganancia (ej: 1.2)" value={editVar.ganancia} onChange={e => setEditVar({ ...editVar, ganancia: e.target.value })} />
+                {editVar.tipoModificador === 'fijo' && (
+                  <input type="number" step="0.1" placeholder="Ganancia (ej: 1.2)" value={editVar.ganancia} onChange={e => setEditVar({ ...editVar, ganancia: e.target.value })} />
+                )}
                 {editVar.tipoModificador === 'porcentual' && (
                   <select value={editVar.aplicaSobre} onChange={e => setEditVar({ ...editVar, aplicaSobre: e.target.value })}>
                     <option value="base">% sobre base</option>
@@ -434,7 +458,7 @@ function AdminVariables() {
                 <span className="price-num var-valor">
                   {v.tipoModificador === 'fijo' ? `$${v.valor.toLocaleString('es-AR')}` : `${v.valor >= 0 ? '+' : ''}${v.valor}%`}
                 </span>
-                <span className="var-ganancia">×{v.ganancia ?? 1}</span>
+                <span className="var-ganancia">{v.tipoModificador === 'fijo' ? `×${v.ganancia ?? 1}` : '—'}</span>
                 <span className="acciones">
                   <button className="btn-secundario" onClick={() => empezarEdicion(v)}>Editar</button>
                   <button className="btn-peligro" onClick={() => eliminar(v.id)}>Eliminar</button>
@@ -447,15 +471,23 @@ function AdminVariables() {
       <div className="form-inline">
         {mostrarNuevaCategoria ? (
           <>
-            <input 
-              placeholder="Nueva categoría" 
-              value={nuevaCategoria} 
+            <input
+              placeholder="Nueva categoría"
+              value={nuevaCategoria}
               onChange={e => { setNuevaCategoria(e.target.value); setError(null) }}
               autoFocus
             />
-            <button 
-              className="btn-secundario" 
-              onClick={() => { setNuevaCategoria(''); setCategoria(''); setMostrarNuevaCategoria(false) }}
+            <label className="checkbox-inline">
+              <input
+                type="checkbox"
+                checked={nuevaEsDescuento}
+                onChange={e => setNuevaEsDescuento(e.target.checked)}
+              />
+              Es de descuento
+            </label>
+            <button
+              className="btn-secundario"
+              onClick={() => { setNuevaCategoria(''); setNuevaEsDescuento(false); setCategoria(''); setMostrarNuevaCategoria(false) }}
               type="button"
             >
               Cancelar
@@ -495,13 +527,15 @@ function AdminVariables() {
           value={valor}
           onChange={e => { setValor(e.target.value); setError(null) }}
         />
-        <input
-          placeholder="Ganancia (ej: 1.2)"
-          type="number"
-          step="0.1"
-          value={ganancia}
-          onChange={e => { setGanancia(e.target.value); setError(null) }}
-        />
+        {tipoModificador === 'fijo' && (
+          <input
+            placeholder="Ganancia (ej: 1.2)"
+            type="number"
+            step="0.1"
+            value={ganancia}
+            onChange={e => { setGanancia(e.target.value); setError(null) }}
+          />
+        )}
         {tipoModificador === 'porcentual' && (
           <select value={aplicaSobre} onChange={e => { setAplicaSobre(e.target.value); setError(null) }}>
             <option value="base">% sobre precio base</option>

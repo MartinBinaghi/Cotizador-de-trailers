@@ -106,7 +106,13 @@ export default function Historial({ onDuplicar }) {
         </div>
       </div>
 
-      {cotizacionesFiltradas.length === 0 && <p>No hay cotizaciones que coincidan con la búsqueda.</p>}
+      {cotizacionesFiltradas.length === 0 && (
+        <div className="panel-vacio">
+          {cotizaciones.length === 0
+            ? 'Todavía no hay cotizaciones guardadas. Creá la primera desde la pestaña Cotizador.'
+            : 'No hay cotizaciones que coincidan con la búsqueda.'}
+        </div>
+      )}
 
       <ul className="lista-admin">
         {cotizacionesFiltradas.map(c => (

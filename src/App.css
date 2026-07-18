@@ -330,7 +330,7 @@ main {
 }
 
 .etiqueta-cantidad,
-.etiqueta-opcional { color: var(--accent-ink); background: var(--accent-soft); }
+.etiqueta-opcional { color: var(--accent-ink); background: var(--accent); }
 
 .miniaturas-imagenes {
   display: flex;
@@ -340,10 +340,25 @@ main {
 }
 
 .miniatura-imagen {
+  position: relative;
+}
+
+.btn-quitar-imagen {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 0.95rem;
+  line-height: 1;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 0.35rem;
+  justify-content: center;
+  box-shadow: var(--shadow);
 }
 
 .miniatura-imagen img {
@@ -445,6 +460,35 @@ main {
   top: 0; left: 0; right: 0;
   height: 3px;
   background: var(--accent);
+}
+
+.resultado-header-config {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.75rem;
+}
+
+.selector-redondeo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  color: var(--ink-faint);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.selector-redondeo select {
+  font-size: 0.78rem;
+  padding: 0.2rem 0.45rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink-soft);
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .resultado .linea-precio {
@@ -638,6 +682,40 @@ main {
   grid-template-columns: auto 1fr 1fr auto auto;
   gap: 1rem;
   align-items: center;
+}
+
+/* Filas alineadas del catálogo (mismo patrón que el historial) */
+.lista-admin li.fila-variable {
+  display: grid;
+  grid-template-columns: 150px 1fr auto auto auto;
+  gap: 1rem;
+  align-items: center;
+}
+
+.lista-admin li.fila-tipo {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 1rem;
+  align-items: center;
+}
+
+.var-categoria {
+  color: var(--ink-faint);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+
+.var-valor {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.var-ganancia {
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+  white-space: nowrap;
 }
 
 .historial-fecha {

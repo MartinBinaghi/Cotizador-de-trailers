@@ -32,7 +32,9 @@ export default function SelectorVariables({ variables, seleccionadas, onToggle, 
 
   return (
     <div className="selector-variables">
+      <label className="campo-oculto" htmlFor="buscador-variables">Buscar variable</label>
       <input
+        id="buscador-variables"
         className="buscador-variables"
         placeholder="Buscar variable..."
         value={busqueda}
@@ -69,6 +71,7 @@ export default function SelectorVariables({ variables, seleccionadas, onToggle, 
                   <input
                     type="number"
                     min="1"
+                    max="999"
                     className="input-cantidad"
                     value={cantidad}
                     onChange={e => onCantidadChange(v.id, e.target.value)}

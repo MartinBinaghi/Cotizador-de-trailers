@@ -113,7 +113,7 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales }) 
   }
 
   function cambiarCantidad(id, valor) {
-    const cantidad = Math.max(1, Math.floor(Number(valor)) || 1)
+    const cantidad = Math.min(999, Math.max(1, Math.floor(Number(valor)) || 1))
     setSeleccionadas(prev => ({ ...prev, [id]: cantidad }))
   }
 

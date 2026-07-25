@@ -36,7 +36,7 @@
 }
 
 .app-header .brand-text span {
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   color: var(--band-ink-soft);
   letter-spacing: 0.03em;
 }
@@ -135,7 +135,7 @@ main {
 }
 
 .grupo-campo > .grupo-titulo {
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink-faint);
@@ -237,7 +237,7 @@ main {
 }
 
 .grupo-variables legend {
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   letter-spacing: 0.07em;
   text-transform: uppercase;
   color: var(--graphite);
@@ -322,7 +322,7 @@ main {
 .etiqueta-opcional {
   display: inline-flex;
   align-items: center;
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   font-weight: 700;
   padding: 0.15rem 0.5rem;
   border-radius: 999px;
@@ -438,7 +438,7 @@ main {
 
 .tabla-comparativa tr.fila-total td {
   background: var(--accent-soft);
-  color: var(--accent-ink);
+  color: var(--ink);
   font-size: 1.05rem;
   border-top: 2px solid var(--accent);
   border-bottom: none;
@@ -472,7 +472,7 @@ main {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   color: var(--ink-faint);
   font-weight: 600;
   text-transform: uppercase;

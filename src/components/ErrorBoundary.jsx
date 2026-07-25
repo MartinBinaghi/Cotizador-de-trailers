@@ -16,11 +16,14 @@ export default class ErrorBoundary extends Component {
     if (this.state.error) {
       return (
         <div className="panel-vacio" role="alert">
-          <p>Ocurrió un error inesperado.</p>
-          <p className="texto-ayuda">{String(this.state.error?.message || this.state.error)}</p>
+          <p>Ocurrió un error inesperado. Tus datos y el borrador de la cotización no se perdieron.</p>
           <button type="button" onClick={() => window.location.reload()}>
             Recargar la aplicación
           </button>
+          <details className="texto-ayuda">
+            <summary>Detalles técnicos</summary>
+            {String(this.state.error?.message || this.state.error)}
+          </details>
         </div>
       )
     }

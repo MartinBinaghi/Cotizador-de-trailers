@@ -7,6 +7,7 @@ import { formatoARS, NOTA_IVA } from '../utils/formato'
 import { normalizarSeleccionadas, serializarSeleccionadas, variablesDesdeSeleccion } from '../utils/seleccionVariables'
 import { leerImagenComoDataUrl } from '../utils/imagenes'
 import SelectorVariables from '../components/SelectorVariables'
+import CampoObservaciones from '../components/CampoObservaciones'
 import { useToast } from '../components/Toast'
 
 const MAX_IMAGENES = 3
@@ -28,6 +29,7 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales }) 
   const [razonSocial, setRazonSocial] = useState('')
   const [cuit, setCuit] = useState('')
   const [imagenes, setImagenes] = useState([])
+  const [observaciones, setObservaciones] = useState('')
   const [redondeo, setRedondeoLocal] = useState(1)
   const [guardando, setGuardando] = useState(false)
   const [borradorListo, setBorradorListo] = useState(false)
@@ -54,6 +56,7 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales }) 
           setRazonSocial(borrador.razonSocial ?? '')
           setCuit(borrador.cuit ?? '')
           setImagenes(borrador.imagenes ?? [])
+          setObservaciones(borrador.observaciones ?? '')
         }
       })
       .finally(() => setBorradorListo(true))
@@ -65,9 +68,9 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales }) 
     if (!borradorListo) return
     db.config.put({
       clave: 'borradorCotizador',
-      valor: { tipoTrailerId, seleccionadas, nombreCliente, razonSocial, cuit, imagenes }
+      valor: { tipoTrailerId, seleccionadas, nombreCliente, razonSocial, cuit, imagenes, observaciones }
     })
-  }, [borradorListo, tipoTrailerId, seleccionadas, nombreCliente, razonSocial, cuit, imagenes])
+  }, [borradorListo, tipoTrailerId, seleccionadas, nombreCliente, razonSocial, cuit, imagenes, observaciones])
 
   // Si llegan datos para duplicar una cotización anterior, los precarga una sola vez
   useEffect(() => {
@@ -78,6 +81,7 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales }) 
       setRazonSocial(datosIniciales.cliente?.razonSocial || '')
       setCuit(datosIniciales.cliente?.cuit || '')
       setImagenes(datosIniciales.imagenes || [])
+      setObservaciones(datosIniciales.observaciones || '')
       onConsumirDatosIniciales?.()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -158,6 +162,7 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales }) 
         precioFinal: resultado.precioFinal,
         cliente: { nombreCliente: nombreCliente.trim(), razonSocial: razonSocial.trim(), cuit: cuit.trim() },
         imagenes,
+        observaciones: observaciones.trim(),
         fecha: new Date().toISOString(),
         // Snapshot del desglose al momento de cotizar: el PDF histórico se
         // dibuja desde acá y no cambia aunque después cambien los precios
@@ -185,7 +190,8 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales }) 
       tipoTrailerNombre: tipoTrailer.nombre,
       variables: variablesSeleccionadas,
       resultado,
-      imagenes
+      imagenes,
+      observaciones: observaciones.trim()
     })
   }
 
@@ -264,6 +270,8 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales }) 
               </div>
             )}
           </div>
+
+          <CampoObservaciones value={observaciones} onChange={setObservaciones} />
         </div>
       </div>
 

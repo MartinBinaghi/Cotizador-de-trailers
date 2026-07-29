@@ -5,7 +5,9 @@ import { calcularPrecioConGanancia, desglosarEstandarYOpcionales } from '../util
 import { generarPdfComparativa } from '../utils/generarPdf'
 import { formatoARS, NOTA_IVA } from '../utils/formato'
 import { variablesDesdeSeleccion } from '../utils/seleccionVariables'
+import { leerImagenComoDataUrl } from '../utils/imagenes'
 import SelectorVariables from '../components/SelectorVariables'
+import CampoObservaciones from '../components/CampoObservaciones'
 import { useToast } from '../components/Toast'
 
 let contadorLocal = 0
@@ -15,7 +17,7 @@ function nuevoId() {
 }
 
 function crearModelo(nombre) {
-  return { id: nuevoId(), nombre, tipoTrailerId: '', seleccionadas: {} }
+  return { id: nuevoId(), nombre, tipoTrailerId: '', seleccionadas: {}, imagen: null }
 }
 
 /**
@@ -29,6 +31,10 @@ export default function Comparativa() {
   const [redondeo, setRedondeoLocal] = useState(1)
 
   const [modelos, setModelos] = useState(() => [crearModelo('Opción 1'), crearModelo('Opción 2')])
+  const [nombreCliente, setNombreCliente] = useState('')
+  const [razonSocial, setRazonSocial] = useState('')
+  const [cuit, setCuit] = useState('')
+  const [observaciones, setObservaciones] = useState('')
 
   useEffect(() => {
     getRedondeo().then(setRedondeoLocal)
@@ -57,6 +63,16 @@ export default function Comparativa() {
       }
       return { ...m, seleccionadas }
     }))
+  }
+
+  async function cambiarImagen(modeloId, file) {
+    if (!file) return
+    try {
+      const imagen = await leerImagenComoDataUrl(file)
+      actualizarModelo(modeloId, { imagen })
+    } catch (err) {
+      showToast(err.message, 'error')
+    }
   }
 
   function cambiarCantidad(modeloId, variableId, valor) {
@@ -119,11 +135,14 @@ export default function Comparativa() {
         precioEstandar: f.precioEstandar,
         totalOpcionales: f.totalOpcionales,
         total: f.resultado.precioFinal,
-        valoresVariables
+        valoresVariables,
+        imagen: f.modelo.imagen
       }
     })
     await generarPdfComparativa({
       fecha: new Date().toISOString(),
+      cliente: { nombreCliente: nombreCliente.trim(), razonSocial: razonSocial.trim(), cuit: cuit.trim() },
+      observaciones: observaciones.trim(),
       variablesInfo: variablesEnUso.map(v => ({ id: v.id, nombre: v.nombre, esOpcional: !!v.esOpcional })),
       columnas
     })
@@ -137,6 +156,28 @@ export default function Comparativa() {
         compará los resultados lado a lado para mostrárselos al cliente.
       </p>
 
+      <div className="form-card">
+        <div className="grupo-campo">
+          <span className="grupo-titulo">Datos del cliente</span>
+          <div className="fila-campos">
+            <label className="campo">
+              Nombre del cliente (opcional)
+              <input value={nombreCliente} onChange={e => setNombreCliente(e.target.value)} placeholder="Nombre del cliente" />
+            </label>
+
+            <label className="campo">
+              Razón social (opcional)
+              <input value={razonSocial} onChange={e => setRazonSocial(e.target.value)} placeholder="Razón social" />
+            </label>
+
+            <label className="campo">
+              CUIT (opcional)
+              <input value={cuit} onChange={e => setCuit(e.target.value)} placeholder="CUIT" />
+            </label>
+          </div>
+        </div>
+      </div>
+
       <div className="comparativa-modelos">
         {modelos.map(m => (
           <TarjetaModelo
@@ -148,6 +189,8 @@ export default function Comparativa() {
             onCambiarTipo={tipoTrailerId => actualizarModelo(m.id, { tipoTrailerId })}
             onToggleVariable={variableId => toggleVariable(m.id, variableId)}
             onCantidadChange={(variableId, valor) => cambiarCantidad(m.id, variableId, valor)}
+            onCambiarImagen={file => cambiarImagen(m.id, file)}
+            onQuitarImagen={() => actualizarModelo(m.id, { imagen: null })}
             onEliminar={modelos.length > 1 ? () => eliminarModelo(m.id) : null}
           />
         ))}
@@ -155,6 +198,10 @@ export default function Comparativa() {
 
       <div className="form-inline">
         <button className="btn-secundario" onClick={agregarModelo}>+ Agregar modelo</button>
+      </div>
+
+      <div className="form-card">
+        <CampoObservaciones value={observaciones} onChange={setObservaciones} />
       </div>
 
       {hayAlgoParaComparar && (
@@ -228,7 +275,7 @@ export default function Comparativa() {
   )
 }
 
-function TarjetaModelo({ modelo, tipos, variables, onCambiarNombre, onCambiarTipo, onToggleVariable, onCantidadChange, onEliminar }) {
+function TarjetaModelo({ modelo, tipos, variables, onCambiarNombre, onCambiarTipo, onToggleVariable, onCantidadChange, onCambiarImagen, onQuitarImagen, onEliminar }) {
   return (
     <div className="tarjeta-modelo">
       <div className="form-inline">
@@ -258,6 +305,34 @@ function TarjetaModelo({ modelo, tipos, variables, onCambiarNombre, onCambiarTip
         onToggle={onToggleVariable}
         onCantidadChange={onCantidadChange}
       />
+
+      <div className="campo">
+        <label>Imagen (opcional)</label>
+        <input
+          type="file"
+          accept="image/*"
+          onChange={e => {
+            onCambiarImagen(e.target.files?.[0])
+            e.target.value = ''
+          }}
+        />
+        {modelo.imagen && (
+          <div className="miniaturas-imagenes">
+            <div className="miniatura-imagen">
+              <img src={modelo.imagen} alt={`Imagen de ${modelo.nombre || 'modelo'}`} />
+              <button
+                type="button"
+                className="btn-quitar-imagen"
+                onClick={onQuitarImagen}
+                aria-label="Quitar imagen"
+                title="Quitar imagen"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

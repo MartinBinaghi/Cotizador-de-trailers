@@ -66,7 +66,8 @@ export default function Historial({ onDuplicar }) {
       tipoTrailerId: c.tipoTrailerId,
       seleccionadas: c.variablesSeleccionadas,
       cliente: c.cliente,
-      imagenes: c.imagenes || []
+      imagenes: c.imagenes || [],
+      observaciones: c.observaciones || ''
     })
     showToast('Cotización cargada en el cotizador')
   }
@@ -81,7 +82,8 @@ export default function Historial({ onDuplicar }) {
         tipoTrailerNombre: c.snapshot.tipoTrailerNombre,
         variables: c.snapshot.detalle,
         resultado: { base: c.snapshot.base, precioFinal: c.precioFinal, detalle: c.snapshot.detalle },
-        imagenes: c.imagenes || []
+        imagenes: c.imagenes || [],
+        observaciones: c.observaciones || ''
       })
       return
     }
@@ -104,7 +106,8 @@ export default function Historial({ onDuplicar }) {
       tipoTrailerNombre: tipoTrailer.nombre,
       variables: variablesSeleccionadas,
       resultado,
-      imagenes: c.imagenes || []
+      imagenes: c.imagenes || [],
+      observaciones: c.observaciones || ''
     })
   }
 

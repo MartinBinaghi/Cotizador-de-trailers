@@ -196,7 +196,7 @@ function dibujarImagenes(doc, yInicial, anchoPagina, altoPagina, imagenes) {
     y = 20
   }
 
-  doc.setFillColor(...COLOR_ACENTO)
+  doc.setFillColor(...COLOR_BANNER_NEGRO)
   doc.rect(MARGEN, y - 3, 2.5, 2.5, 'F')
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(11)

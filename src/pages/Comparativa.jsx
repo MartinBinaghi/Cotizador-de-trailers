@@ -35,10 +35,38 @@ export default function Comparativa() {
   const [razonSocial, setRazonSocial] = useState('')
   const [cuit, setCuit] = useState('')
   const [observaciones, setObservaciones] = useState('')
+  const [borradorListo, setBorradorListo] = useState(false)
 
   useEffect(() => {
     getRedondeo().then(setRedondeoLocal)
   }, [])
+
+  // Igual que en Cotizador: restaura el borrador al montar para no perder la
+  // comparativa al cambiar de pestaña o cerrar la app.
+  useEffect(() => {
+    db.config.get('borradorComparativa')
+      .then(registro => {
+        const borrador = registro?.valor
+        if (borrador?.modelos?.length) {
+          // Evita que nuevoId() repita ids de los modelos restaurados
+          contadorLocal = Math.max(contadorLocal, ...borrador.modelos.map(m => m.id))
+          setModelos(borrador.modelos)
+          setNombreCliente(borrador.nombreCliente ?? '')
+          setRazonSocial(borrador.razonSocial ?? '')
+          setCuit(borrador.cuit ?? '')
+          setObservaciones(borrador.observaciones ?? '')
+        }
+      })
+      .finally(() => setBorradorListo(true))
+  }, [])
+
+  useEffect(() => {
+    if (!borradorListo) return
+    db.config.put({
+      clave: 'borradorComparativa',
+      valor: { modelos, nombreCliente, razonSocial, cuit, observaciones }
+    })
+  }, [borradorListo, modelos, nombreCliente, razonSocial, cuit, observaciones])
 
   function agregarModelo() {
     setModelos(prev => [...prev, crearModelo(`Opción ${prev.length + 1}`)])

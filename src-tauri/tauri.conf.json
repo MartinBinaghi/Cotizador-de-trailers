@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Cotizador de Trailers",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "identifier": "com.binamaquinarias.cotizadortrailers",
   "build": {
     "frontendDist": "../dist",
@@ -28,9 +28,6 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "resources": {
-      "target/release/WebView2Loader.dll": ""
-    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

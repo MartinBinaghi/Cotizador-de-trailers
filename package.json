@@ -1,7 +1,7 @@
 {
   "name": "cotizador-trailers",
   "private": true,
-  "version": "0.1.6",
+  "version": "0.1.7",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -12,6 +12,9 @@
     "tauri:build": "tauri build"
   },
   "dependencies": {
+    "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/plugin-dialog": "^2.7.2",
+    "@tauri-apps/plugin-fs": "^2.5.1",
     "dexie": "^4.0.8",
     "dexie-react-hooks": "^1.1.7",
     "jspdf": "^4.2.1",

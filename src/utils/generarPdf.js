@@ -1,3 +1,4 @@
+import { isTauri } from '@tauri-apps/api/core'
 import { formatoARS, NOTA_IVA } from './formato'
 import { desglosarEstandarYOpcionales } from './calcularPrecio'
 import logoUrl from '../../BINA MAQUINARIAS LOGO_2026_Mesa de trabajo 1 copia.png'
@@ -16,6 +17,27 @@ const COLOR_BANNER_AMARILLO = [255, 204, 0]
 const ALTO_BANNER = 24
 
 const MARGEN = 14
+
+// En la app empaquetada (WebView2) el `<a download>` que usa jsPDF no dispara
+// ningún guardado porque el webview no tiene manejador de descargas por
+// defecto; ahí usamos el diálogo nativo + fs. En el navegador (dev/localhost)
+// el download del propio jsPDF funciona normalmente.
+async function guardarPdf(doc, nombreArchivo) {
+  if (isTauri()) {
+    const [{ save }, { writeFile }] = await Promise.all([
+      import('@tauri-apps/plugin-dialog'),
+      import('@tauri-apps/plugin-fs')
+    ])
+    const destino = await save({
+      defaultPath: nombreArchivo,
+      filters: [{ name: 'PDF', extensions: ['pdf'] }]
+    })
+    if (!destino) return
+    await writeFile(destino, new Uint8Array(doc.output('arraybuffer')))
+    return
+  }
+  doc.save(nombreArchivo)
+}
 
 function formatoFechaArchivo(fechaIso) {
   const fecha = new Date(fechaIso)
@@ -352,7 +374,7 @@ export async function generarPdfCotizacion(datos) {
     .trim()
     .replace(/\s+/g, '-') || 'sin-nombre'
   const nombreArchivo = `cotizacion-${slugCliente}-${formatoFechaArchivo(fecha)}.pdf`
-  doc.save(nombreArchivo)
+  await guardarPdf(doc, nombreArchivo)
 }
 
 /**
@@ -506,5 +528,5 @@ export async function generarPdfComparativa(datos) {
   }
 
   dibujarPiePagina(doc, fecha)
-  doc.save(`comparativa-trailers-${formatoFechaArchivo(fecha)}.pdf`)
+  await guardarPdf(doc, `comparativa-trailers-${formatoFechaArchivo(fecha)}.pdf`)
 }

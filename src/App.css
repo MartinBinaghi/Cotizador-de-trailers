@@ -199,7 +199,7 @@ main {
   font-size: 0.9rem;
 }
 
-.campo input, .campo select {
+.campo input, .campo select, .campo textarea {
   padding: 0.55rem 0.65rem;
   border: 1px solid var(--line-strong);
   border-radius: 7px;
@@ -210,10 +210,15 @@ main {
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.campo input:focus, .campo select:focus {
+.campo input:focus, .campo select:focus, .campo textarea:focus {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.campo textarea {
+  resize: vertical;
+  font-family: inherit;
 }
 
 .selector-variables {
@@ -425,11 +430,6 @@ main {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   border-bottom: none;
-}
-
-.tabla-comparativa td.price-num,
-.tabla-comparativa th.price-num {
-  text-align: right;
 }
 
 .tabla-comparativa tbody tr:nth-child(even) {

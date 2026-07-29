@@ -139,6 +139,34 @@ function dibujarSeccionVariables(doc, yInicial, anchoPagina, altoPagina, titulo,
   return y
 }
 
+/** Sección "Observaciones": título + párrafo con corte de página si no entra. */
+function dibujarObservaciones(doc, yInicial, anchoPagina, altoPagina, texto) {
+  let y = yInicial
+  if (y + 14 > altoPagina - 20) {
+    doc.addPage()
+    y = 20
+  }
+  doc.setFillColor(...COLOR_ACENTO)
+  doc.rect(MARGEN, y - 3, 2.5, 2.5, 'F')
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(11)
+  doc.setTextColor(...COLOR_HEADER)
+  doc.text('Observaciones', MARGEN + 5, y)
+  y += 7
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
+  doc.setTextColor(...COLOR_TEXTO)
+  for (const linea of doc.splitTextToSize(texto, anchoPagina - MARGEN * 2)) {
+    if (y > altoPagina - 20) {
+      doc.addPage()
+      y = 20
+    }
+    doc.text(linea, MARGEN, y)
+    y += 4.5
+  }
+  return y
+}
+
 /** Calcula el ancho/alto (mm) de una imagen respetando su relación de aspecto, sin exceder altoMax ni anchoMax. */
 function medidasImagen(doc, dataUrl, altoMax, anchoMax) {
   const props = doc.getImageProperties(dataUrl)
@@ -202,11 +230,11 @@ function dibujarImagenes(doc, yInicial, anchoPagina, altoPagina, imagenes) {
  * Genera y descarga el PDF de una cotización individual.
  * jsPDF se carga de forma diferida (dynamic import) para no inflar el
  * bundle inicial de la app con una librería que no siempre se usa.
- * @param {{cliente: {nombreCliente?: string, razonSocial?: string, cuit?: string}, fecha: string, tipoTrailerNombre: string, variables: Array, resultado: object, imagenes?: string[]}} datos
+ * @param {{cliente: {nombreCliente?: string, razonSocial?: string, cuit?: string}, fecha: string, tipoTrailerNombre: string, variables: Array, resultado: object, imagenes?: string[], observaciones?: string}} datos
  */
 export async function generarPdfCotizacion(datos) {
   const { jsPDF } = await import('jspdf')
-  const { cliente, fecha, tipoTrailerNombre, variables = [], resultado, imagenes = [] } = datos
+  const { cliente, fecha, tipoTrailerNombre, variables = [], resultado, imagenes = [], observaciones = '' } = datos
   const nombreCliente = cliente?.nombreCliente?.trim() || 'Sin nombre'
   const razonSocial = cliente?.razonSocial?.trim() || ''
   const cuit = cliente?.cuit?.trim() || ''
@@ -308,8 +336,12 @@ export async function generarPdfCotizacion(datos) {
   doc.setTextColor(...COLOR_HEADER)
   doc.text(formatoARS.format(resultado.precioFinal), xDerecha - anchoNota - 2, yCaja, { align: 'right' })
 
+  let yContenido = yFinCaja + 10
   if (imagenes.length > 0) {
-    dibujarImagenes(doc, yFinCaja + 10, anchoPagina, altoPagina, imagenes)
+    yContenido = dibujarImagenes(doc, yContenido, anchoPagina, altoPagina, imagenes) + 4
+  }
+  if (observaciones.trim()) {
+    dibujarObservaciones(doc, yContenido, anchoPagina, altoPagina, observaciones.trim())
   }
 
   dibujarPiePagina(doc, fecha)
@@ -329,12 +361,13 @@ export async function generarPdfCotizacion(datos) {
  * Las variables opcionales muestran su precio, y se agrega una fila
  * "Total opcionales" por columna para que se vea la diferencia entre el
  * trailer estándar y lo que pidió el cliente.
- * @param {{fecha: string, variablesInfo: Array<{id: number, nombre: string, esOpcional: boolean}>, columnas: Array<{nombre: string, tipoTrailerNombre: string, precioEstandar: number, totalOpcionales: number, total: number, valoresVariables: {[id: number]: string}}>}} datos
+ * @param {{fecha: string, cliente?: {nombreCliente?: string, razonSocial?: string, cuit?: string}, observaciones?: string, variablesInfo: Array<{id: number, nombre: string, esOpcional: boolean}>, columnas: Array<{nombre: string, tipoTrailerNombre: string, precioEstandar: number, totalOpcionales: number, total: number, valoresVariables: {[id: number]: string}, imagen?: string|null}>}} datos
  */
 export async function generarPdfComparativa(datos) {
   const { jsPDF } = await import('jspdf')
-  const { fecha, variablesInfo = [], columnas } = datos
-  const doc = new jsPDF({ orientation: 'landscape' })
+  const { fecha, cliente, observaciones = '', variablesInfo = [], columnas } = datos
+  // Vertical (A4 retrato) con tabla compacta, para que se imprima en cualquier impresora común.
+  const doc = new jsPDF()
   const anchoPagina = doc.internal.pageSize.getWidth()
   const altoPagina = doc.internal.pageSize.getHeight()
   const logoDataUrl = await cargarLogoDataUrl()
@@ -342,9 +375,40 @@ export async function generarPdfComparativa(datos) {
   let y = dibujarEncabezado(doc, logoDataUrl)
   y += 14
 
-  const anchoEtiqueta = 48
+  const nombreCliente = cliente?.nombreCliente?.trim() || ''
+  const razonSocial = cliente?.razonSocial?.trim() || ''
+  const cuit = cliente?.cuit?.trim() || ''
+  if (nombreCliente || razonSocial || cuit) {
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.setTextColor(...COLOR_MUTED)
+    doc.text('CLIENTE', MARGEN, y)
+    y += 6
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(12)
+    doc.setTextColor(...COLOR_TEXTO)
+    doc.text(nombreCliente || 'Sin nombre', MARGEN, y)
+    if (razonSocial) {
+      y += 5
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(9)
+      doc.setTextColor(...COLOR_MUTED)
+      doc.text(`Razón social: ${razonSocial}`, MARGEN, y)
+    }
+    if (cuit) {
+      y += 5
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(9)
+      doc.setTextColor(...COLOR_MUTED)
+      doc.text(`CUIT: ${cuit}`, MARGEN, y)
+    }
+    y += 8
+  }
+
+  const anchoEtiqueta = 42
   const anchoDisponible = anchoPagina - MARGEN * 2 - anchoEtiqueta
-  const anchoColumna = Math.max(30, anchoDisponible / columnas.length)
+  // ponytail: con más de 5 modelos las columnas desbordan el ancho de página; achicar mínimos si alguna vez se comparan más
+  const anchoColumna = Math.max(26, anchoDisponible / columnas.length)
 
   const filas = [
     { etiqueta: 'Tipo de trailer', valor: c => c.tipoTrailerNombre },
@@ -358,7 +422,7 @@ export async function generarPdfComparativa(datos) {
     doc.setFillColor(...COLOR_FONDO_SUAVE)
     doc.rect(MARGEN, yInicio, anchoPagina - MARGEN * 2, 11, 'F')
     doc.setFont('helvetica', 'bold')
-    doc.setFontSize(9)
+    doc.setFontSize(8)
     doc.setTextColor(...COLOR_HEADER)
     doc.text('Concepto', MARGEN + 2, yInicio + 7)
     columnas.forEach((c, i) => {
@@ -374,7 +438,7 @@ export async function generarPdfComparativa(datos) {
   y = dibujarEncabezadoColumnas(y)
 
   doc.setFont('helvetica', 'normal')
-  doc.setFontSize(9)
+  doc.setFontSize(8)
 
   for (const fila of filas) {
     const lineasEtiqueta = doc.splitTextToSize(fila.etiqueta, anchoEtiqueta - 4)
@@ -384,14 +448,14 @@ export async function generarPdfComparativa(datos) {
       maxLineas = Math.max(maxLineas, lineas.length)
       return lineas
     })
-    const alturaFila = Math.max(8, maxLineas * 4.2 + 3)
+    const alturaFila = Math.max(7, maxLineas * 3.8 + 3)
 
     if (y + alturaFila > altoPagina - 20) {
       doc.addPage()
       y = 20
       y = dibujarEncabezadoColumnas(y)
       doc.setFont('helvetica', 'normal')
-      doc.setFontSize(9)
+      doc.setFontSize(8)
     }
 
     if (fila.destacada) {
@@ -402,12 +466,12 @@ export async function generarPdfComparativa(datos) {
     doc.setFont('helvetica', fila.destacada ? 'bold' : 'normal')
     doc.setTextColor(...COLOR_TEXTO)
     lineasEtiqueta.forEach((linea, idx) => {
-      doc.text(linea, MARGEN + 2, y + 4.5 + idx * 4.2)
+      doc.text(linea, MARGEN + 2, y + 4.2 + idx * 3.8)
     })
     columnas.forEach((c, i) => {
       const x = MARGEN + anchoEtiqueta + i * anchoColumna
       lineasPorColumna[i].forEach((linea, idx) => {
-        doc.text(linea, x + anchoColumna / 2, y + 4.5 + idx * 4.2, { align: 'center' })
+        doc.text(linea, x + anchoColumna / 2, y + 4.2 + idx * 3.8, { align: 'center' })
       })
     })
 
@@ -415,6 +479,30 @@ export async function generarPdfComparativa(datos) {
     doc.setDrawColor(...COLOR_BORDE)
     doc.setLineWidth(0.15)
     doc.line(MARGEN, y - 1, anchoPagina - MARGEN, y - 1)
+  }
+
+  if (columnas.some(c => c.imagen)) {
+    const ALTO_IMG = 32
+    if (y + ALTO_IMG + 10 > altoPagina - 20) {
+      doc.addPage()
+      y = 20
+    }
+    y += 5
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.setTextColor(...COLOR_MUTED)
+    doc.text('Imagen ilustrativa', MARGEN + 2, y + 4)
+    columnas.forEach((c, i) => {
+      if (!c.imagen) return
+      const x = MARGEN + anchoEtiqueta + i * anchoColumna
+      const medidas = medidasImagen(doc, c.imagen, ALTO_IMG, anchoColumna - 4)
+      doc.addImage(c.imagen, medidas.formato, x + (anchoColumna - medidas.ancho) / 2, y, medidas.ancho, medidas.alto)
+    })
+    y += ALTO_IMG + 4
+  }
+
+  if (observaciones.trim()) {
+    dibujarObservaciones(doc, y + 8, anchoPagina, altoPagina, observaciones.trim())
   }
 
   dibujarPiePagina(doc, fecha)

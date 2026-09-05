@@ -1,28 +1,37 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, exportarBackup, analizarBackup, combinarBackup, actualizarPreciosPorcentaje } from '../db/database'
-import { validarTipoTrailer, validarVariable } from '../utils/validaciones'
+import { validarTipoTrailer } from '../utils/validaciones'
+import { claseDe, perteneceAClase, nombreClase } from '../utils/clasesProductos'
+import { guardarVariable } from '../db/catalogo'
+import SelectorClase from '../components/SelectorClase'
+import AdminClases from '../components/AdminClases'
+import ExportarCatalogo from '../components/ExportarCatalogo'
+import AdminCategorias from '../components/AdminCategorias'
 import { useToast } from '../components/Toast'
 
-export default function Admin() {
+export default function Admin({ claseId, clases }) {
   return (
     <div className="page">
       <h2 className="titulo-pagina">Administrar catálogo</h2>
       <div className="admin-grid">
+        <AdminClases clases={clases} />
+        <ExportarCatalogo />
         <BackupRestore />
-        <AjustePreciosMasivo />
-        <AdminTiposTrailer />
-        <AdminVariables />
+        <AjustePreciosMasivo claseId={claseId} />
+        <AdminTiposTrailer claseId={claseId} clases={clases} />
+        <AdminCategorias claseId={claseId} clases={clases} />
+        <AdminVariables claseId={claseId} clases={clases} />
       </div>
     </div>
   )
 }
 
-function AjustePreciosMasivo() {
-  const tipos = useLiveQuery(() => db.tiposTrailer.toArray(), []) ?? []
+function AjustePreciosMasivo({ claseId }) {
+  const tipos = useLiveQuery(() => db.tiposTrailer.filter(item => perteneceAClase(item, claseId)).toArray(), [claseId]) ?? []
   const variablesFijas = useLiveQuery(
-    () => db.variables.where('tipoModificador').equals('fijo').toArray(),
-    []
+    () => db.variables.where('tipoModificador').equals('fijo').and(item => perteneceAClase(item, claseId)).toArray(),
+    [claseId]
   ) ?? []
   const showToast = useToast()
   const [porcentaje, setPorcentaje] = useState('')
@@ -62,14 +71,14 @@ function AjustePreciosMasivo() {
     const idsVariables = variablesOrdenadas.filter(v => !variablesExcluidas.has(v.id)).map(v => v.id)
 
     if (idsTipos.length === 0 && idsVariables.length === 0) {
-      showToast('Seleccioná al menos un tipo de trailer o variable.', 'error')
+      showToast('Seleccioná al menos un tipo de producto o variable.', 'error')
       return
     }
 
     const accion = pct > 0 ? 'aumentar' : 'disminuir'
     const confirmado = confirm(
       `Esto va a ${accion} un ${Math.abs(pct)}% el precio base/valor fijo de ` +
-      `${idsTipos.length} tipo(s) de trailer y ${idsVariables.length} variable(s) ` +
+      `${idsTipos.length} tipo(s) de producto y ${idsVariables.length} variable(s) ` +
       `marcadas (no afecta a las variables porcentuales). ` +
       `Esta acción no se puede deshacer, salvo restaurando un backup. ¿Continuar?`
     )
@@ -79,7 +88,7 @@ function AjustePreciosMasivo() {
     try {
       const { tiposActualizados, variablesActualizadas } = await actualizarPreciosPorcentaje(pct, idsTipos, idsVariables)
       showToast(
-        `Precios actualizados: ${tiposActualizados} tipos de trailer y ${variablesActualizadas} variables.`
+        `Precios actualizados: ${tiposActualizados} tipos de producto y ${variablesActualizadas} variables.`
       )
       setPorcentaje('')
     } catch (err) {
@@ -94,7 +103,7 @@ function AjustePreciosMasivo() {
       <h3>Ajuste masivo de precios</h3>
       <p className="texto-ayuda">
         Aumenta o disminuye de una sola vez el precio base y el valor fijo ($)
-        de los tipos de trailer y variables que dejes marcados abajo. Las
+        de los tipos de producto y variables que dejes marcados abajo. Las
         variables en porcentaje (%) nunca se modifican. Se recomienda
         descargar un backup antes de aplicar un ajuste masivo.
       </p>
@@ -102,7 +111,7 @@ function AjustePreciosMasivo() {
       <div className="checklist-ajuste">
         <div className="checklist-ajuste-columna">
           <div className="checklist-ajuste-cabecera">
-            <span>Tipos de trailer</span>
+            <span>Tipos de producto</span>
             <button type="button" className="btn-secundario" onClick={() => setTiposExcluidos(new Set())}>Todos</button>
             <button type="button" className="btn-secundario" onClick={() => setTiposExcluidos(new Set(tiposOrdenados.map(t => t.id)))}>Ninguno</button>
           </div>
@@ -152,10 +161,12 @@ function AjustePreciosMasivo() {
   )
 }
 
-function AdminTiposTrailer() {
-  const tipos = useLiveQuery(() => db.tiposTrailer.toArray(), []) ?? []
+function AdminTiposTrailer({ claseId, clases }) {
+  const tipos = useLiveQuery(() => db.tiposTrailer.filter(item => perteneceAClase(item, claseId)).toArray(), [claseId]) ?? []
   const showToast = useToast()
 
+  const [claseNueva, setClaseNueva] = useState(claseId)
+  const [editClase, setEditClase] = useState(claseId)
   const [nombre, setNombre] = useState('')
   const [precioBase, setPrecioBase] = useState('')
   const [ganancia, setGanancia] = useState('')
@@ -171,21 +182,23 @@ function AdminTiposTrailer() {
     const err = validarTipoTrailer(datos)
     if (err) { setError(err); return }
     setError(null)
-    await db.tiposTrailer.add({ nombre: nombre.trim(), precioBase: Number(precioBase), ganancia: Number(ganancia) || 1 })
+    await db.tiposTrailer.add({ claseId: claseNueva, nombre: nombre.trim(), precioBase: Number(precioBase), ganancia: Number(ganancia) || 1 })
+    setClaseNueva(claseId)
     setNombre('')
     setPrecioBase('')
     setGanancia('')
-    showToast('Tipo de trailer agregado')
+    showToast('Tipo de producto agregado')
   }
 
   async function eliminar(id) {
-    if (confirm('¿Eliminar este tipo de trailer?')) {
+    if (confirm('¿Eliminar este tipo de producto?')) {
       await db.tiposTrailer.delete(id)
       showToast('Eliminado', 'info')
     }
   }
 
   function empezarEdicion(t) {
+    setEditClase(claseDe(t))
     setEditandoId(t.id)
     setEditNombre(t.nombre)
     setEditPrecio(String(t.precioBase))
@@ -195,19 +208,20 @@ function AdminTiposTrailer() {
   async function guardarEdicion(id) {
     const err = validarTipoTrailer({ nombre: editNombre, precioBase: editPrecio, ganancia: editGanancia })
     if (err) { showToast(err, 'error'); return }
-    await db.tiposTrailer.update(id, { nombre: editNombre.trim(), precioBase: Number(editPrecio), ganancia: Number(editGanancia) || 1 })
+    await db.tiposTrailer.update(id, { claseId: editClase, nombre: editNombre.trim(), precioBase: Number(editPrecio), ganancia: Number(editGanancia) || 1 })
     setEditandoId(null)
     showToast('Cambios guardados')
   }
 
   return (
     <section className="admin-seccion admin-seccion-ancha">
-      <h3>Tipos de trailer</h3>
+      <h3>Tipos de producto</h3>
       <ul className="lista-admin">
         {tipos.map(t => (
           <li className={editandoId === t.id ? '' : 'fila-tipo'} key={t.id}>
             {editandoId === t.id ? (
               <div className="form-inline">
+                <SelectorClase clases={clases} value={editClase} onChange={setEditClase} />
                 <input value={editNombre} onChange={e => setEditNombre(e.target.value)} />
                 <input type="number" value={editPrecio} onChange={e => setEditPrecio(e.target.value)} />
                 <input type="number" step="0.1" placeholder="Ganancia (ej: 1.2)" value={editGanancia} onChange={e => setEditGanancia(e.target.value)} />
@@ -216,7 +230,7 @@ function AdminTiposTrailer() {
               </div>
             ) : (
               <>
-                <span>{t.nombre}</span>
+                <span>{t.nombre} <span className="etiqueta-clase">{nombreClase(clases, claseDe(t))}</span></span>
                 <span className="price-num var-valor">${t.precioBase.toLocaleString('es-AR')}</span>
                 <span className="var-ganancia">×{t.ganancia ?? 1}</span>
                 <span className="acciones">
@@ -229,6 +243,7 @@ function AdminTiposTrailer() {
         ))}
       </ul>
       <div className="form-inline">
+        <SelectorClase clases={clases} value={claseNueva} onChange={setClaseNueva} />
         <input placeholder="Nombre (ej: Batea)" value={nombre} onChange={e => setNombre(e.target.value)} />
         <input placeholder="Precio base" type="number" value={precioBase} onChange={e => setPrecioBase(e.target.value)} />
         <input placeholder="Ganancia (ej: 1.2)" type="number" step="0.1" value={ganancia} onChange={e => setGanancia(e.target.value)} />
@@ -239,11 +254,14 @@ function AdminTiposTrailer() {
   )
 }
 
-function AdminVariables() {
-  const variables = useLiveQuery(() => db.variables.toArray(), []) ?? []
+function AdminVariables({ claseId, clases }) {
+  const variables = useLiveQuery(() => db.variables.filter(item => perteneceAClase(item, claseId)).toArray(), [claseId]) ?? []
   const categorias = useLiveQuery(() => db.categorias.toArray(), []) ?? []
   const showToast = useToast()
 
+  const [guardandoVariable, setGuardandoVariable] = useState(false)
+  const [claseVariable, setClaseVariable] = useState(claseId)
+  const [claseCategoriaNueva, setClaseCategoriaNueva] = useState(claseId)
   const [categoria, setCategoria] = useState('')
   const [nombre, setNombre] = useState('')
   const [tipoModificador, setTipoModificador] = useState('fijo')
@@ -261,7 +279,7 @@ function AdminVariables() {
   const [editandoId, setEditandoId] = useState(null)
   const [editVar, setEditVar] = useState(null)
 
-  const categoriasExistentes = [...new Set(categorias.map(c => c.nombre))].sort()
+  const categoriasExistentes = [...categorias].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
 
   const variablesOrdenadas = useMemo(() => {
     const termino = busquedaAdmin.trim().toLowerCase()
@@ -277,72 +295,44 @@ function AdminVariables() {
     })
   }, [variables, busquedaAdmin])
 
-  /** Una categoría es de descuento si su registro tiene el flag esDescuento. */
-  function esCategoriaDescuento(nombreCategoria) {
-    const nombreNormalizado = (nombreCategoria || '').trim().toLowerCase()
-    return categorias.some(
-      c => c.nombre.trim().toLowerCase() === nombreNormalizado && c.esDescuento
-    )
+  function esCategoriaDescuento(categoriaId) {
+    return !!categorias.find(c => c.id === Number(categoriaId))?.esDescuento
   }
 
-  // En categorías de descuento, los porcentajes se cargan en positivo y se guardan en negativo
-  function procesarValor(valor, esDescuento, tipo) {
-    let val = Number(valor)
-    if (esDescuento && tipo === 'porcentual' && val > 0) {
-      val = -val
-    }
-    return val
+  function cambiarClaseVariable(nuevaClase) {
+    setClaseVariable(nuevaClase)
+    if (!perteneceAClase(categorias.find(c => c.id === Number(categoria)) ?? {}, nuevaClase)) setCategoria('')
+    if (!perteneceAClase({ claseId: claseCategoriaNueva }, nuevaClase)) setClaseCategoriaNueva(nuevaClase)
+    setError(null)
   }
 
-  async function asegurarCategoriaExistente(nombreCategoria, esDescuento = false) {
-    const categoriaNormalizada = nombreCategoria.trim()
-    if (!categoriaNormalizada) return
-
-    const yaExiste = categorias.some(
-      c => c.nombre.trim().toLowerCase() === categoriaNormalizada.toLowerCase()
-    )
-
-    if (!yaExiste) {
-      await db.categorias.add({ nombre: categoriaNormalizada, esDescuento })
-    }
+  function cambiarClaseEdicion(nuevaClase) {
+    const cat = categorias.find(c => c.id === Number(editVar.categoriaId))
+    setEditVar({ ...editVar, claseId: nuevaClase, categoriaId: cat && perteneceAClase(cat, nuevaClase) ? cat.id : '' })
   }
 
   async function agregar() {
-    const catFinal = mostrarNuevaCategoria ? nuevaCategoria.trim() : categoria.trim()
-    if (!catFinal) {
-      setError('Selecciona o ingresa una categoría')
-      return
-    }
-
-    const esDescuento = mostrarNuevaCategoria ? nuevaEsDescuento : esCategoriaDescuento(catFinal)
-    const datos = { categoria: catFinal, nombre, valor, tipoModificador, ganancia }
-    const err = validarVariable(datos, esDescuento)
-    if (err) { setError(err); return }
-    setError(null)
-
-    const valorFinal = procesarValor(valor, esDescuento, tipoModificador)
-    await asegurarCategoriaExistente(catFinal, esDescuento)
-
-    await db.variables.add({
-      categoria: catFinal,
-      nombre: nombre.trim(),
-      tipoModificador,
-      valor: valorFinal,
-      ganancia: Number(ganancia) || 1,
-      aplicaSobre,
-      permiteCantidad,
-      esOpcional
-    })
-    setCategoria('')
-    setNombre('')
-    setValor('')
-    setGanancia('')
-    setNuevaCategoria('')
-    setNuevaEsDescuento(false)
-    setMostrarNuevaCategoria(false)
-    setPermiteCantidad(false)
-    setEsOpcional(false)
-    showToast('Variable agregada')
+    setGuardandoVariable(true)
+    try {
+      await guardarVariable({
+        claseId: claseVariable, categoriaId: categoria, nombre, valor, tipoModificador,
+        ganancia, aplicaSobre, permiteCantidad, esOpcional
+      }, mostrarNuevaCategoria ? { nombre: nuevaCategoria, claseId: claseCategoriaNueva, esDescuento: nuevaEsDescuento } : null)
+      setCategoria('')
+      setNombre('')
+      setValor('')
+      setGanancia('')
+      setNuevaCategoria('')
+      setNuevaEsDescuento(false)
+      setMostrarNuevaCategoria(false)
+      setPermiteCantidad(false)
+      setEsOpcional(false)
+      setClaseVariable(claseId)
+      setClaseCategoriaNueva(claseId)
+      setError(null)
+      showToast('Variable agregada')
+    } catch (err) { setError(err.message) }
+    finally { setGuardandoVariable(false) }
   }
 
   async function eliminar(id) {
@@ -353,11 +343,11 @@ function AdminVariables() {
   }
 
   function empezarEdicion(v) {
-    // Solo los descuentos porcentuales se editan en positivo (procesarValor
+    // Solo los descuentos porcentuales se editan en positivo (guardarVariable
     // re-invierte el signo al guardar). El resto muestra su valor tal cual,
     // para no convertir silenciosamente un valor negativo en positivo.
     const esDescuentoPorcentual =
-      v.tipoModificador === 'porcentual' && esCategoriaDescuento(v.categoria)
+      v.tipoModificador === 'porcentual' && esCategoriaDescuento(v.categoriaId)
     setEditandoId(v.id)
     setEditVar({
       ...v,
@@ -369,30 +359,19 @@ function AdminVariables() {
   }
 
   async function guardarEdicion(id) {
-    const esDescuento = esCategoriaDescuento(editVar.categoria)
-    const err = validarVariable(editVar, esDescuento)
-    if (err) { showToast(err, 'error'); return }
-
-    const valorFinal = procesarValor(editVar.valor, esDescuento, editVar.tipoModificador)
-    await asegurarCategoriaExistente(editVar.categoria, esDescuento)
-
-    await db.variables.update(id, {
-      categoria: editVar.categoria.trim(),
-      nombre: editVar.nombre.trim(),
-      tipoModificador: editVar.tipoModificador,
-      valor: valorFinal,
-      ganancia: Number(editVar.ganancia) || 1,
-      aplicaSobre: editVar.aplicaSobre,
-      permiteCantidad: !!editVar.permiteCantidad,
-      esOpcional: !!editVar.esOpcional
-    })
-    setEditandoId(null)
-    showToast('Cambios guardados')
+    setGuardandoVariable(true)
+    try {
+      await guardarVariable({ ...editVar, id })
+      setEditandoId(null)
+      showToast('Cambios guardados')
+    } catch (err) { showToast(err.message, 'error') }
+    finally { setGuardandoVariable(false) }
   }
 
   return (
     <section className="admin-seccion admin-seccion-ancha">
-      <h3>Variables (frenos, homologación, etc.)</h3>
+      <h3>Variables</h3>
+      <p className="texto-ayuda">Elegí una categoría de la misma clase o Universal. Las variables Universal requieren una categoría Universal.</p>
       <input
         className="buscador-variables"
         placeholder="Buscar variable por nombre o categoría..."
@@ -407,10 +386,11 @@ function AdminVariables() {
           <li className={editandoId === v.id ? '' : 'fila-variable'} key={v.id}>
             {editandoId === v.id ? (
               <div className="form-inline">
-                <select value={editVar.categoria} onChange={e => setEditVar({ ...editVar, categoria: e.target.value })}>
+                <SelectorClase clases={clases} value={editVar.claseId} onChange={cambiarClaseEdicion} />
+                <select aria-label="Categoría de la variable" value={editVar.categoriaId} onChange={e => setEditVar({ ...editVar, categoriaId: Number(e.target.value) })}>
                   <option value="">Seleccionar categoría...</option>
-                  {categoriasExistentes.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
+                  {categoriasExistentes.filter(cat => perteneceAClase(cat, editVar.claseId)).map(cat => (
+                    <option key={cat.id} value={cat.id}>{cat.nombre} ({nombreClase(clases, claseDe(cat))})</option>
                   ))}
                 </select>
                 <input value={editVar.nombre} onChange={e => setEditVar({ ...editVar, nombre: e.target.value })} />
@@ -444,14 +424,14 @@ function AdminVariables() {
                   />
                   Es opcional
                 </label>
-                <button onClick={() => guardarEdicion(v.id)}>Guardar</button>
+                <button disabled={guardandoVariable} onClick={() => guardarEdicion(v.id)}>Guardar</button>
                 <button className="btn-secundario" onClick={() => setEditandoId(null)}>Cancelar</button>
               </div>
             ) : (
               <>
                 <span className="var-categoria">{v.categoria}</span>
                 <span>
-                  {v.nombre}
+                  {v.nombre} <span className="etiqueta-clase">{nombreClase(clases, claseDe(v))}</span>
                   {v.permiteCantidad && <span className="etiqueta-cantidad">admite cantidad</span>}
                   {v.esOpcional && <span className="etiqueta-opcional">opcional</span>}
                 </span>
@@ -469,6 +449,7 @@ function AdminVariables() {
         ))}
       </ul>
       <div className="form-inline">
+        <SelectorClase clases={clases} value={claseVariable} onChange={cambiarClaseVariable} label="Clase de la variable" />
         {mostrarNuevaCategoria ? (
           <>
             <input
@@ -477,6 +458,7 @@ function AdminVariables() {
               onChange={e => { setNuevaCategoria(e.target.value); setError(null) }}
               autoFocus
             />
+            <SelectorClase clases={clases.filter(c => perteneceAClase({ claseId: c.id }, claseVariable))} value={claseCategoriaNueva} onChange={setClaseCategoriaNueva} label="Clase de la nueva categoría" />
             <label className="checkbox-inline">
               <input
                 type="checkbox"
@@ -494,7 +476,7 @@ function AdminVariables() {
             </button>
           </>
         ) : (
-          <select value={categoria} onChange={e => {
+          <select aria-label="Categoría de la nueva variable" value={categoria} onChange={e => {
             setError(null)
             if (e.target.value === '__nueva__') {
               setNuevaCategoria('')
@@ -506,8 +488,8 @@ function AdminVariables() {
             }
           }}>
             <option value="">Seleccionar categoría...</option>
-            {categoriasExistentes.map(cat => (
-              <option key={cat} value={cat}>{cat}</option>
+            {categoriasExistentes.filter(cat => perteneceAClase(cat, claseVariable)).map(cat => (
+              <option key={cat.id} value={cat.id}>{cat.nombre} ({nombreClase(clases, claseDe(cat))})</option>
             ))}
             <option value="__nueva__">+ Agregar nueva categoría</option>
           </select>
@@ -558,7 +540,7 @@ function AdminVariables() {
           />
           Es opcional
         </label>
-        <button onClick={agregar}>Agregar</button>
+        <button disabled={guardandoVariable} onClick={agregar}>{guardandoVariable ? 'Guardando…' : 'Agregar'}</button>
       </div>
       {error && <p className="error-texto">{error}</p>}
     </section>
@@ -593,7 +575,7 @@ function BackupRestore() {
       const data = JSON.parse(texto)
       const analisis = await analizarBackup(data)
 
-      const totalNuevos = analisis.tiposTrailer.nuevos.length + analisis.categorias.nuevos.length +
+      const totalNuevos = analisis.clasesProductos.nuevos.length + analisis.tiposTrailer.nuevos.length + analisis.categorias.nuevos.length +
         analisis.variables.nuevos.length + analisis.cotizaciones.nuevos.length
       const totalDuplicados = analisis.tiposTrailer.duplicados.length + analisis.categorias.duplicados.length +
         analisis.variables.duplicados.length + analisis.cotizaciones.duplicados.length

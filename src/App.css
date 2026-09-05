@@ -125,7 +125,65 @@ main {
   gap: 1rem;
 }
 
+.espacio-clase {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.barra-clase {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 1rem;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.selector-clase {
+  min-width: min(100%, 12rem);
+  max-width: 100%;
+}
+
+.selector-clase select { width: 100%; }
+.form-inline > button { align-self: end; }
+
+.etiqueta-clase {
+  display: inline-block;
+  color: var(--ink);
+  background: var(--surface-alt, var(--paper));
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 400;
+}
+
+.lista-clases {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+  padding-left: 1.25rem;
+}
+
+.dialogo-clase {
+  width: min(32rem, calc(100% - 2rem));
+  padding: 1.5rem;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+}
+
+.dialogo-clase::backdrop { background: rgb(0 0 0 / 45%); }
+.dialogo-clase h3 { margin: 0 0 1rem; }
+.dialogo-clase p { line-height: 1.5; }
+
 .form-card {
+  min-width: 0;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -188,7 +246,7 @@ main {
 }
 
 @media (max-width: 980px) {
-  .cotizador-layout { grid-template-columns: 1fr; }
+  .cotizador-layout { grid-template-columns: minmax(0, 1fr); }
   .panel-lateral { position: static; }
 }
 
@@ -199,6 +257,7 @@ main {
 }
 
 .campo {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
@@ -208,6 +267,8 @@ main {
 }
 
 .campo input, .campo select, .campo textarea {
+  min-width: 0;
+  max-width: 100%;
   padding: 0.55rem 0.65rem;
   border: 1px solid var(--line-strong);
   border-radius: 7px;

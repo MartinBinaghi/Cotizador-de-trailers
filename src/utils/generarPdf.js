@@ -433,7 +433,7 @@ export async function generarPdfComparativa(datos) {
   const anchoColumna = Math.max(26, anchoDisponible / columnas.length)
 
   const filas = [
-    { etiqueta: 'Tipo de trailer', valor: c => c.tipoTrailerNombre },
+    { etiqueta: 'Tipo de producto', valor: c => c.tipoTrailerNombre },
     { etiqueta: 'Precio estándar', valor: c => formatoARS.format(c.precioEstandar) },
     ...variablesInfo.map(vi => ({ etiqueta: vi.nombre, valor: c => c.valoresVariables[vi.id] ?? '—' })),
     { etiqueta: 'Total opcionales', valor: c => formatoARS.format(c.totalOpcionales) },

@@ -1,5 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import { formatoARS } from '../utils/formato'
+import { claseDe, nombreClase } from '../utils/clasesProductos'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { db } from '../db/database'
 
 /**
  * Lista de variables agrupadas por categoría, con buscador y orden alfabético.
@@ -12,8 +15,10 @@ import { formatoARS } from '../utils/formato'
  * @param {(id: number) => void} props.onToggle
  * @param {(id: number, cantidad: string|number) => void} props.onCantidadChange
  */
-export default function SelectorVariables({ variables, seleccionadas, onToggle, onCantidadChange }) {
+export default function SelectorVariables({ variables, clases = [], seleccionadas, onToggle, onCantidadChange }) {
   const [busqueda, setBusqueda] = useState('')
+  const busquedaId = useId()
+  const registrosCategorias = useLiveQuery(() => db.categorias.toArray(), []) ?? []
 
   const variablesFiltradas = useMemo(() => {
     const termino = busqueda.trim().toLowerCase()
@@ -26,15 +31,17 @@ export default function SelectorVariables({ variables, seleccionadas, onToggle, 
   }, [variables, busqueda])
 
   const categorias = useMemo(
-    () => [...new Set(variablesFiltradas.map(v => v.categoria))].sort((a, b) => a.localeCompare(b, 'es')),
+    () => [...new Map(variablesFiltradas.map(v => [v.categoriaId ?? v.categoria, {
+      id: v.categoriaId ?? v.categoria, nombre: v.categoria
+    }])).values()].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')),
     [variablesFiltradas]
   )
 
   return (
     <div className="selector-variables">
-      <label className="campo-oculto" htmlFor="buscador-variables">Buscar variable</label>
+      <label className="campo-oculto" htmlFor={busquedaId}>Buscar variable</label>
       <input
-        id="buscador-variables"
+        id={busquedaId}
         className="buscador-variables"
         placeholder="Buscar variable..."
         value={busqueda}
@@ -47,9 +54,13 @@ export default function SelectorVariables({ variables, seleccionadas, onToggle, 
 
       <div className="grupos-variables">
       {categorias.map(cat => (
-        <fieldset key={cat} className="grupo-variables">
-          <legend>{cat}</legend>
-          {variablesFiltradas.filter(v => v.categoria === cat).map(v => {
+        <fieldset key={cat.id} className="grupo-variables">
+          <legend>{cat.nombre}{' '}
+            <span className="etiqueta-clase">
+              {nombreClase(clases, claseDe(registrosCategorias.find(c => c.id === cat.id) ?? {}))}
+            </span>
+          </legend>
+          {variablesFiltradas.filter(v => (v.categoriaId ?? v.categoria) === cat.id).map(v => {
             const estaSeleccionada = Object.prototype.hasOwnProperty.call(seleccionadas, v.id)
             const cantidad = seleccionadas[v.id] ?? 1
             return (
@@ -61,6 +72,7 @@ export default function SelectorVariables({ variables, seleccionadas, onToggle, 
                     onChange={() => onToggle(v.id)}
                   />
                   {v.nombre}{' '}
+                  <span className="etiqueta-clase">{nombreClase(clases, claseDe(v))}</span>{' '}
                   <span className="modificador">
                     {v.tipoModificador === 'fijo'
                       ? `(${formatoARS.format(v.valor)})`

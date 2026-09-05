@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, getRedondeo, setRedondeo } from '../db/database'
+import { db, guardarBorrador, getRedondeo, setRedondeo } from '../db/database'
 import { calcularPrecioConGanancia, desglosarEstandarYOpcionales } from '../utils/calcularPrecio'
 import { generarPdfCotizacion } from '../utils/generarPdf'
 import { formatoARS, NOTA_IVA } from '../utils/formato'
@@ -8,6 +8,7 @@ import { normalizarSeleccionadas, serializarSeleccionadas, variablesDesdeSelecci
 import { leerImagenComoDataUrl } from '../utils/imagenes'
 import SelectorVariables from '../components/SelectorVariables'
 import CampoObservaciones from '../components/CampoObservaciones'
+import { CLASE_TRAILERS, perteneceAClase, claseDe, nombreClase, seleccionVisible } from '../utils/clasesProductos'
 import { useToast } from '../components/Toast'
 
 const MAX_IMAGENES = 3
@@ -18,10 +19,10 @@ const MAX_IMAGENES = 3
  *   Si viene seteado (ej. al duplicar una cotización desde el Historial), precarga el formulario.
  * @param {() => void} props.onConsumirDatosIniciales callback para limpiar datosIniciales luego de usarlos
  */
-export default function Cotizador({ datosIniciales, onConsumirDatosIniciales }) {
+export default function Cotizador({ datosIniciales, onConsumirDatosIniciales, claseId, clases }) {
   const showToast = useToast()
-  const tipos = useLiveQuery(() => db.tiposTrailer.toArray(), []) ?? []
-  const variables = useLiveQuery(() => db.variables.toArray(), []) ?? []
+  const tipos = useLiveQuery(() => db.tiposTrailer.filter(item => perteneceAClase(item, claseId)).toArray(), [claseId]) ?? []
+  const variables = useLiveQuery(() => db.variables.filter(item => perteneceAClase(item, claseId)).toArray(), [claseId]) ?? []
 
   const [tipoTrailerId, setTipoTrailerId] = useState('')
   const [seleccionadas, setSeleccionadas] = useState({})
@@ -51,7 +52,7 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales }) 
     db.config.get('borradorCotizador')
       .then(registro => {
         const borrador = registro?.valor
-        if (borrador) {
+        if (borrador && (borrador.claseId ?? CLASE_TRAILERS) === claseId) {
           setTipoTrailerId(borrador.tipoTrailerId ?? '')
           setSeleccionadas(borrador.seleccionadas ?? {})
           setNombreCliente(borrador.nombreCliente ?? '')
@@ -68,11 +69,9 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales }) 
   // Persiste el borrador ante cualquier cambio del formulario
   useEffect(() => {
     if (!borradorListo) return
-    db.config.put({
-      clave: 'borradorCotizador',
-      valor: { tipoTrailerId, seleccionadas, nombreCliente, razonSocial, cuit, imagenes, observaciones }
-    })
-  }, [borradorListo, tipoTrailerId, seleccionadas, nombreCliente, razonSocial, cuit, imagenes, observaciones])
+    guardarBorrador('cotizador', 'borradorCotizador', claseId, { tipoTrailerId, seleccionadas, nombreCliente, razonSocial, cuit, imagenes, observaciones })
+      .catch(() => showToast('No se pudo guardar el borrador. Intentá nuevamente.', 'error'))
+  }, [claseId, borradorListo, tipoTrailerId, seleccionadas, nombreCliente, razonSocial, cuit, imagenes, observaciones])
 
   // Si llegan datos para duplicar una cotización anterior, los precarga una sola vez
   useEffect(() => {
@@ -166,14 +165,15 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales }) 
 
   async function guardarCotizacion() {
     if (!tipoTrailer || !resultado) {
-      showToast('Elegí un tipo de trailer antes de guardar', 'error')
+      showToast('Elegí un tipo de producto antes de guardar', 'error')
       return
     }
     setGuardando(true)
     try {
       await db.cotizaciones.add({
+        claseId,
         tipoTrailerId: tipoTrailer.id,
-        variablesSeleccionadas: serializarSeleccionadas(seleccionadas),
+        variablesSeleccionadas: serializarSeleccionadas(seleccionVisible(seleccionadas, variables)),
         precioFinal: resultado.precioFinal,
         cliente: { nombreCliente: nombreCliente.trim(), razonSocial: razonSocial.trim(), cuit: cuit.trim() },
         imagenes,
@@ -196,7 +196,7 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales }) 
 
   async function descargarPdf() {
     if (!tipoTrailer || !resultado) {
-      showToast('Elegí un tipo de trailer antes de generar el PDF', 'error')
+      showToast('Elegí un tipo de producto antes de generar el PDF', 'error')
       return
     }
     await generarPdfCotizacion({
@@ -251,11 +251,11 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales }) 
         <div className="grupo-campo">
           <span className="grupo-titulo">Configuración</span>
           <label className="campo">
-            Tipo de trailer
+            Tipo de producto
             <select value={tipoTrailerId} onChange={e => setTipoTrailerId(e.target.value)}>
               <option value="">Seleccionar...</option>
               {tipos.map(t => (
-                <option key={t.id} value={t.id}>{t.nombre} — {formatoARS.format(t.precioBase)}</option>
+                <option key={t.id} value={t.id}>{t.nombre} ({nombreClase(clases, claseDe(t))}) — {formatoARS.format(t.precioBase)}</option>
               ))}
             </select>
           </label>
@@ -263,6 +263,7 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales }) 
           <SelectorVariables
             key={versionFormulario}
             variables={variables}
+            clases={clases}
             seleccionadas={seleccionadas}
             onToggle={toggleVariable}
             onCantidadChange={cambiarCantidad}
@@ -359,7 +360,7 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales }) 
         </div>
       )}
       {!resultado && (
-        <div className="panel-vacio">Elegí un tipo de trailer para ver el precio.</div>
+        <div className="panel-vacio">Elegí un tipo de producto para ver el precio.</div>
       )}
       </aside>
       </div>

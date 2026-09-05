@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
-import { seedIfEmpty } from './db/database'
+import { db, seedIfEmpty } from './db/database'
+import EspacioClase from './components/EspacioClase'
+import { claseDe, CLASE_UNIVERSAL, CLASE_TRAILERS } from './utils/clasesProductos'
 import { ToastProvider } from './components/Toast'
 import ErrorBoundary from './components/ErrorBoundary'
 import Cotizador from './pages/Cotizador'
@@ -40,8 +42,13 @@ export default function App() {
     setTema(prev => (prev === 'oscuro' ? 'claro' : 'oscuro'))
   }
 
-  function handleDuplicar(datos) {
-    setDatosParaDuplicar(datos)
+  async function handleDuplicar(datos) {
+    const tipo = datos.tipoTrailerId == null ? null : await db.tiposTrailer.get(datos.tipoTrailerId)
+    const candidata = tipo && claseDe(tipo) !== CLASE_UNIVERSAL
+      ? claseDe(tipo) : (datos.claseEliminada ? CLASE_UNIVERSAL : datos.claseId ?? CLASE_TRAILERS)
+    const claseId = await db.clasesProductos.get(candidata) ? candidata : CLASE_UNIVERSAL
+    await db.config.put({ clave: 'claseSeleccionada:cotizador', valor: claseId })
+    setDatosParaDuplicar({ ...datos, claseId, tipoTrailerId: tipo?.id ?? '' })
     setTab('cotizador')
   }
 
@@ -53,7 +60,7 @@ export default function App() {
             <img src="/logo.png" alt="BINA Maquinarias" />
             <div className="brand-text">
               <strong>BINA Maquinarias</strong>
-              <span>Cotizador de Trailers</span>
+              <span>Cotizador de productos</span>
             </div>
           </div>
           <div className="app-header-derecha">
@@ -84,13 +91,21 @@ export default function App() {
               y el resto de la app (header/nav) sigue funcionando */}
           <ErrorBoundary key={tab}>
             {tab === 'cotizador' && (
-              <Cotizador
+              <EspacioClase pantalla="cotizador" borrador="borradorCotizador">
+              {({ claseId, clases }) => <Cotizador
+                claseId={claseId}
+                clases={clases}
                 datosIniciales={datosParaDuplicar}
                 onConsumirDatosIniciales={() => setDatosParaDuplicar(null)}
-              />
+              />}
+              </EspacioClase>
             )}
-            {tab === 'comparativa' && <Comparativa />}
-            {tab === 'admin' && <Admin />}
+            {tab === 'comparativa' && <EspacioClase pantalla="comparativa" borrador="borradorComparativa">
+              {props => <Comparativa {...props} />}
+            </EspacioClase>}
+            {tab === 'admin' && <EspacioClase pantalla="catalogo">
+              {props => <Admin {...props} />}
+            </EspacioClase>}
             {tab === 'historial' && <Historial onDuplicar={handleDuplicar} />}
           </ErrorBoundary>
         </main>

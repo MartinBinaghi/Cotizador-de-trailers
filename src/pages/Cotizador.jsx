@@ -32,6 +32,8 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales }) 
   const [observaciones, setObservaciones] = useState('')
   const [redondeo, setRedondeoLocal] = useState(1)
   const [guardando, setGuardando] = useState(false)
+  const [cargandoImagenes, setCargandoImagenes] = useState(false)
+  const [versionFormulario, setVersionFormulario] = useState(0)
   const [borradorListo, setBorradorListo] = useState(false)
 
   useEffect(() => {
@@ -106,6 +108,17 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales }) 
   const margenGanancia = costo && resultado ? resultado.precioFinal - costo.precioFinal : 0
   const margenGananciaPct = costo && costo.precioFinal > 0 ? (margenGanancia / costo.precioFinal) * 100 : 0
 
+  function limpiarBorrador() {
+    setTipoTrailerId('')
+    setSeleccionadas({})
+    setNombreCliente('')
+    setRazonSocial('')
+    setCuit('')
+    setImagenes([])
+    setObservaciones('')
+    setVersionFormulario(version => version + 1)
+  }
+
   function toggleVariable(id) {
     setSeleccionadas(prev => {
       if (Object.prototype.hasOwnProperty.call(prev, id)) {
@@ -129,6 +142,7 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales }) 
       showToast(`Se pueden cargar hasta ${MAX_IMAGENES} imágenes.`, 'error')
     }
     const seleccionadas = files.slice(0, espacioDisponible)
+    setCargandoImagenes(true)
     try {
       const nuevas = await Promise.all(seleccionadas.map(leerImagenComoDataUrl))
       setImagenes(prev => [...prev, ...nuevas])
@@ -136,6 +150,7 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales }) 
       showToast(err.message, 'error')
     } finally {
       e.target.value = ''
+      setCargandoImagenes(false)
     }
   }
 
@@ -197,7 +212,17 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales }) 
 
   return (
     <div className="page">
-      <h2 className="titulo-pagina">Nueva cotización</h2>
+      <div className="cotizador-encabezado">
+        <h2 className="titulo-pagina">Nueva cotización</h2>
+        <button
+          type="button"
+          className="btn-secundario"
+          onClick={limpiarBorrador}
+          disabled={!borradorListo || guardando || cargandoImagenes}
+        >
+          Limpiar borrador
+        </button>
+      </div>
 
       <div className="cotizador-layout">
       <div className="form-card">
@@ -236,6 +261,7 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales }) 
           </label>
 
           <SelectorVariables
+            key={versionFormulario}
             variables={variables}
             seleccionadas={seleccionadas}
             onToggle={toggleVariable}
@@ -249,7 +275,7 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales }) 
               accept="image/*"
               multiple
               onChange={agregarImagenes}
-              disabled={imagenes.length >= MAX_IMAGENES}
+              disabled={cargandoImagenes || imagenes.length >= MAX_IMAGENES}
             />
             {imagenes.length > 0 && (
               <div className="miniaturas-imagenes">

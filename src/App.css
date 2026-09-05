@@ -117,6 +117,14 @@ main {
   text-wrap: balance;
 }
 
+.cotizador-encabezado {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
 .form-card {
   background: var(--surface);
   border: 1px solid var(--line);

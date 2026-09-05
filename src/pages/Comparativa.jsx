@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, getRedondeo } from '../db/database'
+import { db, guardarBorrador, getRedondeo } from '../db/database'
 import { calcularPrecioConGanancia, desglosarEstandarYOpcionales } from '../utils/calcularPrecio'
 import { generarPdfComparativa } from '../utils/generarPdf'
 import { formatoARS, NOTA_IVA } from '../utils/formato'
@@ -8,6 +8,7 @@ import { variablesDesdeSeleccion } from '../utils/seleccionVariables'
 import { leerImagenComoDataUrl } from '../utils/imagenes'
 import SelectorVariables from '../components/SelectorVariables'
 import CampoObservaciones from '../components/CampoObservaciones'
+import { CLASE_TRAILERS, perteneceAClase, claseDe, nombreClase } from '../utils/clasesProductos'
 import { useToast } from '../components/Toast'
 
 let contadorLocal = 0
@@ -24,10 +25,10 @@ function crearModelo(nombre) {
  * Permite armar varias configuraciones (distintos modelos/variables) y ver
  * los resultados uno al lado del otro, para facilitarle la comparación al cliente.
  */
-export default function Comparativa() {
+export default function Comparativa({ claseId, clases }) {
   const showToast = useToast()
-  const tipos = useLiveQuery(() => db.tiposTrailer.toArray(), []) ?? []
-  const variables = useLiveQuery(() => db.variables.toArray(), []) ?? []
+  const tipos = useLiveQuery(() => db.tiposTrailer.filter(item => perteneceAClase(item, claseId)).toArray(), [claseId]) ?? []
+  const variables = useLiveQuery(() => db.variables.filter(item => perteneceAClase(item, claseId)).toArray(), [claseId]) ?? []
   const [redondeo, setRedondeoLocal] = useState(1)
 
   const [modelos, setModelos] = useState(() => [crearModelo('Opción 1'), crearModelo('Opción 2')])
@@ -47,7 +48,7 @@ export default function Comparativa() {
     db.config.get('borradorComparativa')
       .then(registro => {
         const borrador = registro?.valor
-        if (borrador?.modelos?.length) {
+        if (borrador?.modelos?.length && (borrador.claseId ?? CLASE_TRAILERS) === claseId) {
           // Evita que nuevoId() repita ids de los modelos restaurados
           contadorLocal = Math.max(contadorLocal, ...borrador.modelos.map(m => m.id))
           setModelos(borrador.modelos)
@@ -62,11 +63,9 @@ export default function Comparativa() {
 
   useEffect(() => {
     if (!borradorListo) return
-    db.config.put({
-      clave: 'borradorComparativa',
-      valor: { modelos, nombreCliente, razonSocial, cuit, observaciones }
-    })
-  }, [borradorListo, modelos, nombreCliente, razonSocial, cuit, observaciones])
+    guardarBorrador('comparativa', 'borradorComparativa', claseId, { modelos, nombreCliente, razonSocial, cuit, observaciones })
+      .catch(() => showToast('No se pudo guardar el borrador. Intentá nuevamente.', 'error'))
+  }, [claseId, borradorListo, modelos, nombreCliente, razonSocial, cuit, observaciones])
 
   function agregarModelo() {
     setModelos(prev => [...prev, crearModelo(`Opción ${prev.length + 1}`)])
@@ -139,7 +138,7 @@ export default function Comparativa() {
   async function descargarComparativaPdf() {
     const modelosValidos = filasComparativa.filter(f => f.tipoTrailer && f.resultado)
     if (modelosValidos.length === 0) {
-      showToast('Completá al menos un modelo con tipo de trailer para exportar', 'error')
+      showToast('Completá al menos un modelo con tipo de producto para exportar', 'error')
       return
     }
     const columnas = modelosValidos.map(f => {
@@ -180,7 +179,7 @@ export default function Comparativa() {
     <div className="page page-comparativa">
       <h2 className="titulo-pagina">Comparativa de modelos</h2>
       <p className="texto-ayuda">
-        Armá dos o más configuraciones (distinto tipo de trailer y/o variables) y
+        Armá dos o más configuraciones (distinto tipo de producto y/o variables) y
         compará los resultados lado a lado para mostrárselos al cliente.
       </p>
 
@@ -212,6 +211,7 @@ export default function Comparativa() {
             key={m.id}
             modelo={m}
             tipos={tipos}
+            clases={clases}
             variables={variables}
             onCambiarNombre={nombre => actualizarModelo(m.id, { nombre })}
             onCambiarTipo={tipoTrailerId => actualizarModelo(m.id, { tipoTrailerId })}
@@ -250,7 +250,7 @@ export default function Comparativa() {
               </thead>
               <tbody>
                 <tr>
-                  <td>Tipo de trailer</td>
+                  <td>Tipo de producto</td>
                   {filasComparativa.map(f => (
                     <td key={f.modelo.id}>{f.tipoTrailer?.nombre ?? '—'}</td>
                   ))}
@@ -303,7 +303,7 @@ export default function Comparativa() {
   )
 }
 
-function TarjetaModelo({ modelo, tipos, variables, onCambiarNombre, onCambiarTipo, onToggleVariable, onCantidadChange, onCambiarImagen, onQuitarImagen, onEliminar }) {
+function TarjetaModelo({ modelo, tipos, clases, variables, onCambiarNombre, onCambiarTipo, onToggleVariable, onCantidadChange, onCambiarImagen, onQuitarImagen, onEliminar }) {
   return (
     <div className="tarjeta-modelo">
       <div className="form-inline">
@@ -318,17 +318,18 @@ function TarjetaModelo({ modelo, tipos, variables, onCambiarNombre, onCambiarTip
       </div>
 
       <label className="campo">
-        Tipo de trailer
+        Tipo de producto
         <select value={modelo.tipoTrailerId} onChange={e => onCambiarTipo(e.target.value)}>
           <option value="">Seleccionar...</option>
           {tipos.map(t => (
-            <option key={t.id} value={t.id}>{t.nombre} — {formatoARS.format(t.precioBase)}</option>
+            <option key={t.id} value={t.id}>{t.nombre} ({nombreClase(clases, claseDe(t))}) — {formatoARS.format(t.precioBase)}</option>
           ))}
         </select>
       </label>
 
       <SelectorVariables
         variables={variables}
+        clases={clases}
         seleccionadas={modelo.seleccionadas}
         onToggle={onToggleVariable}
         onCantidadChange={onCantidadChange}

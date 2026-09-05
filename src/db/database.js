@@ -1,5 +1,5 @@
 import Dexie from 'dexie'
-import { normalizarSeleccionadas, serializarSeleccionadas } from '../utils/seleccionVariables'
+import { CLASE_TRAILERS, CLASES_INICIALES, normalizarNombre } from '../utils/clasesProductos.js'
 
 // Toda la data vive en el navegador (IndexedDB). No hay backend ni nube.
 export const db = new Dexie('CotizadorTrailersDB')
@@ -86,208 +86,57 @@ db.version(5).stores({
   })
 })
 
+// v6 conserva los ids históricos y vincula las variables por id de categoría.
+// El nombre deja de ser único globalmente: cada clase tiene su propio catálogo.
+db.version(6).stores({
+  clasesProductos: 'id, &nombre',
+  tiposTrailer: '++id, nombre, precioBase, claseId',
+  categorias: '++id, nombre, claseId, &[claseId+nombre]',
+  variables: '++id, categoria, categoriaId, nombre, tipoModificador, valor, aplicaSobre, claseId',
+  cotizaciones: '++id, tipoTrailerId, fecha, precioFinal',
+  config: 'clave'
+}).upgrade(async tx => {
+  await tx.table('clasesProductos').bulkAdd(CLASES_INICIALES)
+  await tx.table('tiposTrailer').toCollection().modify({ claseId: CLASE_TRAILERS })
+  await tx.table('categorias').toCollection().modify({ claseId: CLASE_TRAILERS })
+  const categorias = await tx.table('categorias').toArray()
+  const porNombre = new Map(categorias.map(c => [normalizarNombre(c.nombre), c]))
+  const variables = await tx.table('variables').toArray()
+  for (const variable of variables) {
+    let categoria = porNombre.get(normalizarNombre(variable.categoria))
+    if (!categoria) {
+      categoria = { nombre: String(variable.categoria || 'Sin categoría').trim(), claseId: CLASE_TRAILERS,
+        esDescuento: esNombreDescuento(variable.categoria) }
+      categoria.id = await tx.table('categorias').add(categoria)
+      porNombre.set(normalizarNombre(variable.categoria), categoria)
+    }
+    await tx.table('variables').update(variable.id, {
+      claseId: CLASE_TRAILERS, categoriaId: categoria.id, categoria: categoria.nombre
+    })
+  }
+  await tx.table('cotizaciones').toCollection().modify({ claseId: CLASE_TRAILERS })
+})
+
+db.on('populate', tx => tx.table('clasesProductos').bulkAdd(CLASES_INICIALES))
+
 /** Heurística usada SOLO para migrar/importar datos que no traen el flag esDescuento. */
 function esNombreDescuento(nombre) {
   return String(nombre ?? '').toLowerCase().includes('descuento')
 }
 
-// --- Backup / restore ---
+export { exportarBackup, analizarBackup, combinarBackup } from './backup.js'
 
-/** Exporta toda la base a un objeto plano, listo para JSON.stringify */
-export async function exportarBackup() {
-  const [tiposTrailer, categorias, variables, cotizaciones, config] = await Promise.all([
-    db.tiposTrailer.toArray(),
-    db.categorias.toArray(),
-    db.variables.toArray(),
-    db.cotizaciones.toArray(),
-    db.config.toArray()
-  ])
-  return {
-    version: 1,
-    fechaExportacion: new Date().toISOString(),
-    tiposTrailer,
-    categorias,
-    variables,
-    cotizaciones,
-    config
-  }
-}
-
-function normalizarTexto(s) {
-  return String(s ?? '').trim().toLowerCase()
-}
-
-function nombreClienteDe(cliente) {
-  if (!cliente) return ''
-  if (typeof cliente === 'string') return cliente === 'Sin nombre' ? '' : cliente
-  return cliente.nombreCliente || ''
-}
-
-const claveTipoTrailer = item => normalizarTexto(item.nombre)
-const claveCategoria = item => normalizarTexto(item.nombre)
-const claveVariable = item => `${normalizarTexto(item.categoria)}|${normalizarTexto(item.nombre)}`
-const claveCotizacion = item =>
-  `${item.fecha}|${item.precioFinal}|${normalizarTexto(nombreClienteDe(item.cliente))}`
-
-function separarNuevosYDuplicados(itemsBackup, itemsLocal, claveFn) {
-  const mapaLocal = new Map(itemsLocal.map(item => [claveFn(item), item]))
-  const nuevos = []
-  const duplicados = []
-  for (const item of itemsBackup) {
-    const local = mapaLocal.get(claveFn(item))
-    if (local) duplicados.push({ backup: item, local })
-    else nuevos.push(item)
-  }
-  return { nuevos, duplicados }
-}
-
-/**
- * Compara un backup contra los datos locales SIN modificar la base.
- * Para cada tabla separa los registros del backup en "nuevos" (no existen
- * localmente) y "duplicados" (ya hay un registro local equivalente, según
- * nombre normalizado — o categoría+nombre para variables, o
- * cliente+fecha+total para cotizaciones). La tabla 'config' no se analiza:
- * nunca se combina, se mantiene siempre la local.
- */
-export async function analizarBackup(data) {
-  if (!data || !Array.isArray(data.tiposTrailer) || !Array.isArray(data.variables)) {
-    throw new Error('El archivo no tiene el formato esperado de backup.')
-  }
-
-  const [tiposTrailerLocal, categoriasLocal, variablesLocal, cotizacionesLocal] = await Promise.all([
-    db.tiposTrailer.toArray(),
-    db.categorias.toArray(),
-    db.variables.toArray(),
-    db.cotizaciones.toArray()
-  ])
-
-  const categoriasBackup = Array.isArray(data.categorias) && data.categorias.length > 0
-    ? data.categorias.map(c => ({ esDescuento: esNombreDescuento(c.nombre), ...c }))
-    : [...new Set(data.variables.map(v => v.categoria).filter(Boolean))]
-        .map(nombre => ({ nombre, esDescuento: esNombreDescuento(nombre) }))
-
-  return {
-    tiposTrailer: separarNuevosYDuplicados(data.tiposTrailer, tiposTrailerLocal, claveTipoTrailer),
-    categorias: separarNuevosYDuplicados(categoriasBackup, categoriasLocal, claveCategoria),
-    variables: separarNuevosYDuplicados(data.variables, variablesLocal, claveVariable),
-    cotizaciones: separarNuevosYDuplicados(
-      Array.isArray(data.cotizaciones) ? data.cotizaciones : [],
-      cotizacionesLocal,
-      claveCotizacion
-    )
-  }
-}
-
-/**
- * Aplica el resultado de analizarBackup(): agrega todos los registros
- * "nuevos" (nunca se pierden datos locales) y, para los "duplicados",
- * sobrescribe con los datos del backup o los deja como están según
- * `sobrescribirDuplicados`. Los ids que trae el backup son locales de OTRA
- * instalación y no se reutilizan: se remapean tipoTrailerId y los ids de
- * variables dentro de variablesSeleccionadas de cada cotización, para que
- * sigan apuntando al registro correcto ya combinado.
- * @returns {Promise<{agregados: number, sobrescritos: number, mantenidos: number}>}
- */
-export async function combinarBackup(analisis, sobrescribirDuplicados) {
-  let agregados = 0
-  let sobrescritos = 0
-  let mantenidos = 0
-  const mapaTipoTrailerId = new Map()
-  const mapaVariableId = new Map()
-
-  function remapVariablesSeleccionadas(variablesSeleccionadas) {
-    const mapa = normalizarSeleccionadas(variablesSeleccionadas)
-    const remapeado = {}
-    for (const [idStr, cantidad] of Object.entries(mapa)) {
-      const idOriginal = Number(idStr)
-      const idFinal = mapaVariableId.get(idOriginal) ?? idOriginal
-      remapeado[idFinal] = cantidad
-    }
-    return serializarSeleccionadas(remapeado)
-  }
-
-  function prepararCotizacion(item) {
-    const { id: _idBackup, ...resto } = item
-    if (resto.tipoTrailerId != null && mapaTipoTrailerId.has(resto.tipoTrailerId)) {
-      resto.tipoTrailerId = mapaTipoTrailerId.get(resto.tipoTrailerId)
-    }
-    resto.variablesSeleccionadas = remapVariablesSeleccionadas(resto.variablesSeleccionadas)
-    if (typeof resto.cliente === 'string') {
-      resto.cliente = { nombreCliente: nombreClienteDe(resto.cliente), razonSocial: '', cuit: '' }
-    } else if (!resto.cliente || typeof resto.cliente !== 'object') {
-      resto.cliente = { nombreCliente: '', razonSocial: '', cuit: '' }
-    }
-    return resto
-  }
-
-  await db.transaction('rw', db.tiposTrailer, db.categorias, db.variables, db.cotizaciones, async () => {
-    for (const item of analisis.tiposTrailer.nuevos) {
-      const { id: idBackup, ...resto } = item
-      const nuevoId = await db.tiposTrailer.add(resto)
-      if (idBackup != null) mapaTipoTrailerId.set(idBackup, nuevoId)
-      agregados++
-    }
-    for (const { backup, local } of analisis.tiposTrailer.duplicados) {
-      if (sobrescribirDuplicados) {
-        const { id: _idBackup, ...resto } = backup
-        await db.tiposTrailer.update(local.id, resto)
-        sobrescritos++
-      } else {
-        mantenidos++
-      }
-      if (backup.id != null) mapaTipoTrailerId.set(backup.id, local.id)
-    }
-
-    for (const item of analisis.categorias.nuevos) {
-      const { id: _idBackup, ...resto } = item
-      await db.categorias.add(resto)
-      agregados++
-    }
-    for (const { backup, local } of analisis.categorias.duplicados) {
-      if (sobrescribirDuplicados) {
-        const { id: _idBackup, ...resto } = backup
-        await db.categorias.update(local.id, resto)
-        sobrescritos++
-      } else {
-        mantenidos++
-      }
-    }
-
-    for (const item of analisis.variables.nuevos) {
-      const { id: idBackup, ...resto } = item
-      const nuevoId = await db.variables.add(resto)
-      if (idBackup != null) mapaVariableId.set(idBackup, nuevoId)
-      agregados++
-    }
-    for (const { backup, local } of analisis.variables.duplicados) {
-      if (sobrescribirDuplicados) {
-        const { id: _idBackup, ...resto } = backup
-        await db.variables.update(local.id, resto)
-        sobrescritos++
-      } else {
-        mantenidos++
-      }
-      if (backup.id != null) mapaVariableId.set(backup.id, local.id)
-    }
-
-    for (const item of analisis.cotizaciones.nuevos) {
-      await db.cotizaciones.add(prepararCotizacion(item))
-      agregados++
-    }
-    for (const { backup, local } of analisis.cotizaciones.duplicados) {
-      if (sobrescribirDuplicados) {
-        await db.cotizaciones.update(local.id, prepararCotizacion(backup))
-        sobrescritos++
-      } else {
-        mantenidos++
-      }
-    }
+export async function guardarBorrador(pantalla, clave, claseId, valor) {
+  await db.transaction('rw', db.config, db.clasesProductos, async () => {
+    if (!await db.clasesProductos.get(claseId)) return
+    const seleccion = await db.config.get(`claseSeleccionada:${pantalla}`)
+    // Una lectura de imagen o un efecto del formulario anterior puede terminar
+    // después del cambio de clase; nunca debe revivir el borrador descartado.
+    if ((seleccion?.valor ?? CLASE_TRAILERS) !== claseId) return
+    await db.config.put({ clave, valor: { ...valor, claseId } })
   })
-
-  return { agregados, sobrescritos, mantenidos }
 }
 
-// --- Configuración: redondeo del precio final ---
 // Valores posibles: 1 (sin redondeo), 100, 1000, 10000
 export async function getRedondeo() {
   const c = await db.config.get('redondeo')
@@ -370,7 +219,7 @@ async function ensureCategoriasSeeded() {
     : ['Frenos', 'Homologación', 'Ejes', 'Descuentos']
 
   await db.categorias.bulkAdd(
-    categoriasFinales.map(nombre => ({ nombre, esDescuento: esNombreDescuento(nombre) }))
+    categoriasFinales.map(nombre => ({ nombre, claseId: CLASE_TRAILERS, esDescuento: esNombreDescuento(nombre) }))
   )
 }
 
@@ -382,7 +231,9 @@ async function ensureCategoriasSeeded() {
 // hasta que la primera termine, y al ejecutar ya ve el catálogo poblado
 // en vez de volver a insertarlo (lo que antes duplicaba los tipos de trailer).
 export async function seedIfEmpty() {
-  await db.transaction('rw', db.tiposTrailer, db.categorias, db.variables, async () => {
+  await db.transaction('rw', db.tiposTrailer, db.categorias, db.variables, db.clasesProductos, async () => {
+    // Si el usuario eliminó Trailers, el seed de desarrollo no debe revivir sus datos.
+    if (!await db.clasesProductos.get(CLASE_TRAILERS)) return
     const count = await db.tiposTrailer.count()
     if (count > 0) {
       await ensureCategoriasSeeded()
@@ -393,14 +244,14 @@ export async function seedIfEmpty() {
       { nombre: 'Semirremolque', precioBase: 8000000 },
       { nombre: 'Batea', precioBase: 6500000 },
       { nombre: 'Tanque', precioBase: 9500000 }
-    ])
+    ].map(item => ({ ...item, claseId: CLASE_TRAILERS })))
 
     await db.categorias.bulkAdd([
       { nombre: 'Frenos', esDescuento: false },
       { nombre: 'Homologación', esDescuento: false },
       { nombre: 'Ejes', esDescuento: false },
       { nombre: 'Descuentos', esDescuento: true }
-    ])
+    ].map(item => ({ ...item, claseId: CLASE_TRAILERS })))
 
     await db.variables.bulkAdd([
       { categoria: 'Frenos', nombre: '2 frenos', tipoModificador: 'fijo', valor: 150000, aplicaSobre: 'base' },
@@ -408,6 +259,10 @@ export async function seedIfEmpty() {
       { categoria: 'Homologación', nombre: 'Homologado', tipoModificador: 'porcentual', valor: 15, aplicaSobre: 'subtotal' },
       { categoria: 'Ejes', nombre: 'Eje reforzado', tipoModificador: 'fijo', valor: 400000, aplicaSobre: 'base' },
       { categoria: 'Descuentos', nombre: 'Descuento por pago de contado', tipoModificador: 'porcentual', valor: -5, aplicaSobre: 'subtotal' }
-    ])
+    ].map(item => ({ ...item, claseId: CLASE_TRAILERS })))
+    const categorias = await db.categorias.toArray()
+    for (const categoria of categorias) {
+      await db.variables.where('categoria').equals(categoria.nombre).modify({ categoriaId: categoria.id })
+    }
   })
 }

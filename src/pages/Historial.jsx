@@ -61,8 +61,10 @@ export default function Historial({ onDuplicar }) {
     }
   }
 
-  function duplicar(c) {
-    onDuplicar?.({
+  async function duplicar(c) {
+    await onDuplicar?.({
+      claseEliminada: c.claseEliminada,
+      claseId: c.claseId,
       tipoTrailerId: c.tipoTrailerId,
       seleccionadas: c.variablesSeleccionadas,
       cliente: c.cliente,
@@ -146,7 +148,7 @@ export default function Historial({ onDuplicar }) {
           <li className="fila-historial" key={c.id}>
             <span className="historial-fecha">{new Date(c.fecha).toLocaleString('es-AR')}</span>
             <span className="historial-cliente">{textoCliente(c)}</span>
-            <span className="historial-tipo">{nombreTipo(c.tipoTrailerId)}</span>
+            <span className="historial-tipo">{c.snapshot?.tipoTrailerNombre ?? nombreTipo(c.tipoTrailerId)}</span>
             <strong className="price-num">{formatoARS.format(c.precioFinal)} <span className="nota-iva">{NOTA_IVA}</span></strong>
             <span className="acciones">
               <button className="btn-secundario" onClick={() => duplicar(c)}>Duplicar</button>

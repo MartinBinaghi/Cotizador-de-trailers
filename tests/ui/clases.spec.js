@@ -1,0 +1,268 @@
+import { test, expect } from '@playwright/test'
+import ExcelJS from 'exceljs'
+
+test.beforeEach(async ({ page }) => {
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'Nueva cotización' })).toBeVisible()
+  // Datos ficticios únicamente en el contexto aislado de este navegador.
+  await page.evaluate(async () => {
+    const { db } = await import('/src/db/database.js')
+    await db.transaction('rw', db.tiposTrailer, db.categorias, db.variables, db.cotizaciones, db.config, async () => {
+      await db.tiposTrailer.clear()
+      await db.categorias.clear()
+      await db.variables.clear()
+      await db.cotizaciones.clear()
+      await db.config.clear()
+      await db.tiposTrailer.bulkAdd([
+        { id: 11, nombre: 'Trailer prueba', claseId: 'trailers', precioBase: 1000 },
+        { id: 12, nombre: 'Caja prueba', claseId: 'cajas', precioBase: 2000 },
+        { id: 13, nombre: 'Producto compartido', claseId: 'universal', precioBase: 3000 }
+      ])
+      await db.categorias.bulkAdd([
+        { id: 101, nombre: 'Accesorios', claseId: 'trailers', esDescuento: false },
+        { id: 102, nombre: 'Accesorios', claseId: 'cajas', esDescuento: false },
+        { id: 103, nombre: 'Comunes', claseId: 'universal', esDescuento: false }
+      ])
+      await db.variables.bulkAdd([
+        { id: 201, nombre: 'Luz trailer', categoria: 'Accesorios', categoriaId: 101, claseId: 'trailers', valor: 100, tipoModificador: 'fijo', aplicaSobre: 'base' },
+        { id: 202, nombre: 'Luz caja', categoria: 'Accesorios', categoriaId: 102, claseId: 'cajas', valor: 200, tipoModificador: 'fijo', aplicaSobre: 'base' },
+        { id: 203, nombre: 'Pintura común', categoria: 'Comunes', categoriaId: 103, claseId: 'universal', valor: 300, tipoModificador: 'fijo', aplicaSobre: 'base' }
+      ])
+    })
+  })
+  await page.reload()
+  await expect(page.getByRole('checkbox', { name: /Luz trailer/ })).toBeVisible()
+})
+
+const selector = page => page.locator('.barra-clase select')
+async function cambiar(page, clase, aceptar = true) {
+  await selector(page).selectOption(clase)
+  await page.getByRole('dialog').getByRole('button', { name: aceptar ? 'Confirmar cambio de clase' : 'Cancelar', exact: true }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+}
+const seccion = (page, titulo) => page.locator('section').filter({ has: page.getByRole('heading', { name: titulo, exact: true }) })
+
+test('cancelar conserva el borrador; aceptar limpia y conserva la clase al recargar', async ({ page }) => {
+  await page.getByLabel('Nombre del cliente (opcional)').fill('Cliente temporal')
+  await page.getByRole('combobox', { name: 'Tipo de producto', exact: true }).selectOption('11')
+  await page.getByRole('checkbox', { name: /Luz trailer/ }).check()
+  await cambiar(page, 'cajas', false)
+  await expect(selector(page)).toHaveValue('trailers')
+  await expect(page.getByLabel('Nombre del cliente (opcional)')).toHaveValue('Cliente temporal')
+  await expect(page.getByRole('checkbox', { name: /Luz trailer/ })).toBeChecked()
+  await cambiar(page, 'cajas')
+  await expect(page.getByLabel('Nombre del cliente (opcional)')).toHaveValue('')
+  await expect(page.getByRole('combobox', { name: 'Tipo de producto', exact: true })).toHaveValue('')
+  await expect(page.getByRole('checkbox', { name: /Luz trailer/ })).toHaveCount(0)
+  await expect(page.getByRole('checkbox', { name: /Luz caja/ })).toBeVisible()
+  await expect(page.getByRole('checkbox', { name: /Pintura común/ })).toBeVisible()
+  await page.reload()
+  await expect(selector(page)).toHaveValue('cajas')
+  await expect(page.getByLabel('Nombre del cliente (opcional)')).toHaveValue('')
+})
+
+test('cada pantalla conserva su clase y el ajuste masivo filtra los datos', async ({ page }) => {
+  await cambiar(page, 'cajas')
+  await page.getByRole('button', { name: 'Catálogo', exact: true }).click()
+  await expect(selector(page)).toHaveValue('trailers')
+  await cambiar(page, 'cajas')
+  const ajuste = seccion(page, 'Ajuste masivo de precios')
+  await expect(ajuste.getByText('Trailer prueba', { exact: true })).toHaveCount(0)
+  await expect(ajuste.getByText('Caja prueba', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Comparativa', exact: true }).click()
+  await expect(selector(page)).toHaveValue('trailers')
+  await page.getByRole('button', { name: 'Cotizador', exact: true }).click()
+  await expect(selector(page)).toHaveValue('cajas')
+  await page.getByRole('button', { name: 'Catálogo', exact: true }).click()
+  await expect(selector(page)).toHaveValue('cajas')
+})
+
+test('alta de clases y productos toma la clase actual y permite Universal', async ({ page }) => {
+  await page.getByRole('button', { name: 'Catálogo', exact: true }).click()
+  const clases = seccion(page, 'Clases de productos')
+  await clases.getByLabel('Nueva clase', { exact: true }).fill('Carrocerías')
+  await clases.getByRole('button', { name: 'Crear clase' }).click()
+  await expect(selector(page).locator('option').filter({ hasText: 'Carrocerías' })).toHaveCount(1)
+  const nuevaId = await selector(page).locator('option').filter({ hasText: 'Carrocerías' }).getAttribute('value')
+  await cambiar(page, nuevaId)
+  const tipos = seccion(page, 'Tipos de producto')
+  await expect(tipos.getByRole('combobox', { name: 'Clase de producto', exact: true })).toHaveValue(nuevaId)
+  await tipos.getByPlaceholder('Nombre (ej: Batea)').fill('Modelo nuevo')
+  await tipos.getByPlaceholder('Precio base', { exact: true }).fill('500')
+  await tipos.getByRole('button', { name: 'Agregar', exact: true }).click()
+  await expect(tipos.getByText('Modelo nuevo', { exact: false })).toBeVisible()
+  await tipos.getByRole('button', { name: 'Editar', exact: true }).last().click()
+  await tipos.getByRole('combobox', { name: 'Clase de producto', exact: true }).first().selectOption('universal')
+  await tipos.getByRole('button', { name: 'Guardar', exact: true }).click()
+  await cambiar(page, 'cajas')
+  await expect(tipos.getByText('Modelo nuevo', { exact: false })).toBeVisible()
+})
+
+test('categorías homónimas se editan sin modificar la otra clase', async ({ page }) => {
+  await page.getByRole('button', { name: 'Catálogo', exact: true }).click()
+  const cats = seccion(page, 'Categorías')
+  await cats.getByRole('button', { name: 'Editar categoría' }).first().click()
+  await cats.getByLabel('Nombre de categoría').first().fill('Accesorios trailer')
+  await cats.getByRole('button', { name: 'Guardar', exact: true }).click()
+  await cambiar(page, 'cajas')
+  await expect(cats.getByText('Accesorios', { exact: false })).toBeVisible()
+  await expect(cats.getByText('Accesorios trailer', { exact: false })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Cotizador', exact: true }).click()
+  await expect(page.locator('legend').filter({ hasText: 'Accesorios trailer' })).toBeVisible()
+})
+
+test('comparativa descarta cliente y modelos al confirmar el cambio', async ({ page }) => {
+  await page.getByRole('button', { name: 'Comparativa', exact: true }).click()
+  await page.getByLabel('Nombre del cliente (opcional)').fill('Comparación anterior')
+  await page.getByRole('combobox', { name: 'Tipo de producto', exact: true }).first().selectOption('11')
+  await page.getByRole('checkbox', { name: /Luz trailer/ }).first().check()
+  await cambiar(page, 'cajas')
+  await expect(page.getByLabel('Nombre del cliente (opcional)')).toHaveValue('')
+  await expect(page.getByRole('combobox', { name: 'Tipo de producto', exact: true }).first()).toHaveValue('')
+  await expect(page.getByRole('checkbox', { name: /Luz trailer/ })).toHaveCount(0)
+  await expect(page.getByRole('checkbox', { name: /Luz caja/ })).toHaveCount(2)
+})
+
+test('duplicar una cotización abre su clase en el cotizador', async ({ page }) => {
+  await cambiar(page, 'cajas')
+  await page.getByRole('combobox', { name: 'Tipo de producto', exact: true }).selectOption('12')
+  await page.getByLabel('Nombre del cliente (opcional)').fill('Cliente caja')
+  await page.getByRole('button', { name: 'Guardar cotización' }).click()
+  await cambiar(page, 'trailers')
+  await page.getByRole('button', { name: 'Historial', exact: true }).click()
+  await page.getByRole('button', { name: /Duplicar/ }).click()
+  await expect(selector(page)).toHaveValue('cajas')
+  await expect(page.getByRole('combobox', { name: 'Tipo de producto', exact: true })).toHaveValue('12')
+  await expect(page.getByLabel('Nombre del cliente (opcional)')).toHaveValue('Cliente caja')
+})
+
+test('variable Universal exige categoría Universal y aparece en Cajas', async ({ page }) => {
+  await page.getByRole('button', { name: 'Catálogo', exact: true }).click()
+  const variables = seccion(page, 'Variables')
+  const fila = variables.locator('li').first()
+  await expect(fila).toContainText('Luz trailer')
+  await fila.getByRole('button', { name: 'Editar', exact: true }).click()
+  await fila.getByRole('combobox', { name: 'Clase de producto', exact: true }).selectOption('universal')
+  const categoria = fila.getByRole('combobox', { name: 'Categoría de la variable', exact: true })
+  await expect(categoria).toHaveValue('')
+  await expect(categoria.locator('option')).toHaveText(['Seleccionar categoría...', 'Comunes (Universal)'])
+  await fila.getByRole('button', { name: 'Guardar', exact: true }).click()
+  await expect(page.getByText('Seleccioná una categoría.', { exact: true })).toBeVisible()
+  await categoria.selectOption('103')
+  await fila.getByRole('button', { name: 'Guardar', exact: true }).click()
+  await page.getByRole('button', { name: 'Cotizador', exact: true }).click()
+  await cambiar(page, 'cajas')
+  await expect(page.getByRole('checkbox', { name: /Luz trailer Universal/ })).toBeVisible()
+})
+
+test('nueva variable toma la clase actual y ofrece categorías compatibles', async ({ page }) => {
+  await page.getByRole('button', { name: 'Catálogo', exact: true }).click()
+  await cambiar(page, 'cajas')
+  const variables = seccion(page, 'Variables')
+  await expect(variables.getByRole('combobox', { name: 'Clase de la variable', exact: true })).toHaveValue('cajas')
+  const categoria = variables.getByRole('combobox', { name: 'Categoría de la nueva variable', exact: true })
+  await expect(categoria.locator('option')).toHaveText(['Seleccionar categoría...', 'Accesorios (Cajas)', 'Comunes (Universal)', '+ Agregar nueva categoría'])
+  await categoria.selectOption('102')
+  await variables.getByPlaceholder('Nombre (ej: 4 frenos)').fill('Accesorio caja nuevo')
+  await variables.getByPlaceholder('Valor', { exact: true }).fill('80')
+  await variables.getByRole('button', { name: 'Agregar', exact: true }).click()
+  await expect(variables.locator('li').filter({ hasText: 'Accesorio caja nuevo' })).toContainText('Cajas')
+  await cambiar(page, 'trailers')
+  await expect(variables.locator('li').filter({ hasText: 'Accesorio caja nuevo' })).toHaveCount(0)
+})
+
+test('no permite volver exclusiva una categoría con variables universales', async ({ page }) => {
+  await page.getByRole('button', { name: 'Catálogo', exact: true }).click()
+  const cats = seccion(page, 'Categorías')
+  const fila = cats.locator('li').last()
+  await expect(fila).toContainText('Comunes')
+  await fila.getByRole('button', { name: 'Editar categoría' }).click()
+  await fila.getByRole('combobox', { name: 'Clase de producto', exact: true }).selectOption('trailers')
+  await fila.getByRole('button', { name: 'Guardar', exact: true }).click()
+  await expect(page.getByText(/No se puede cambiar la clase:/)).toBeVisible()
+  await fila.getByRole('button', { name: 'Cancelar', exact: true }).click()
+  await expect(fila).toContainText('Universal')
+})
+
+test('selector y confirmación se adaptan a móvil y conservan foco de teclado', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await selector(page).focus()
+  await selector(page).selectOption('cajas')
+  const dialogo = page.getByRole('dialog')
+  await expect(dialogo.getByRole('button', { name: 'Cancelar', exact: true })).toBeFocused()
+  await page.screenshot({ path: testInfo.outputPath('confirmacion-movil.png') })
+  await page.keyboard.press('Escape')
+  await expect(dialogo).toHaveCount(0)
+  await expect(selector(page)).toHaveValue('trailers')
+  await expect(selector(page)).toBeFocused()
+  await expect(page.locator('.barra-clase')).toBeVisible()
+  const ancho = await page.evaluate(() => ({ documento: document.documentElement.scrollWidth, ventana: innerWidth }))
+  expect(ancho.documento).toBeLessThanOrEqual(ancho.ventana)
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await page.getByRole('button', { name: 'Cambiar a modo oscuro', exact: true }).click()
+  await page.screenshot({ path: testInfo.outputPath('cotizador-oscuro.png'), fullPage: true })
+})
+
+test('exporta Excel con todas las clases aunque el catálogo esté filtrado', async ({ page }) => {
+  await page.getByRole('button', { name: 'Catálogo', exact: true }).click()
+  await cambiar(page, 'cajas')
+  const descarga = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Exportar catálogo completo (.xlsx)', exact: true }).click()
+  const archivo = await descarga
+  expect(archivo.suggestedFilename()).toMatch(/^catalogo-completo-\d{4}-\d{2}-\d{2}\.xlsx$/)
+  const libro = new ExcelJS.Workbook()
+  await libro.xlsx.readFile(await archivo.path())
+  expect(libro.getWorksheet('Tipos de producto').rowCount).toBe(4)
+  const valores = libro.getWorksheet('Tipos de producto').getColumn(2).values
+  expect(valores).toContain('Trailer prueba')
+  expect(valores).toContain('Caja prueba')
+  expect(valores).toContain('Producto compartido')
+  expect(libro.getWorksheet('Variables').rowCount).toBe(4)
+  await expect(page.getByRole('button', { name: 'Exportar catálogo completo (.xlsx)', exact: true })).toBeEnabled()
+})
+
+test('eliminar una clase pide confirmación y nunca ofrece eliminar Universal', async ({ page }, testInfo) => {
+  await page.getByRole('button', { name: 'Catálogo', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Eliminar clase Universal', exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Eliminar clase Trailers', exact: true }).click()
+  let dialogo = page.getByRole('dialog', { name: 'Eliminar clase Trailers', exact: true })
+  await expect(dialogo).toContainText('tipos de producto (1)')
+  await dialogo.screenshot({ path: testInfo.outputPath('confirmar-eliminacion.png') })
+  await dialogo.getByRole('button', { name: 'Cancelar', exact: true }).click()
+  await expect(selector(page)).toHaveValue('trailers')
+  await expect(page.getByRole('button', { name: 'Eliminar clase Trailers', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Eliminar clase Trailers', exact: true }).click()
+  await dialogo.getByRole('button', { name: 'Eliminar clase y sus datos', exact: true }).click()
+  await expect(selector(page)).toHaveValue('universal')
+  await expect(selector(page).locator('option[value="trailers"]')).toHaveCount(0)
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  // Recuperar una clase desde un backup no debe restaurar una selección vieja.
+  await page.evaluate(async () => {
+    const { db } = await import('/src/db/database.js')
+    await db.clasesProductos.add({ id: 'trailers', nombre: 'Trailers' })
+  })
+  await expect(selector(page).locator('option[value="trailers"]')).toHaveCount(1)
+  await expect(selector(page)).toHaveValue('universal')
+  await page.reload()
+  await expect(selector(page)).toHaveValue('universal')
+  await expect(page.getByRole('checkbox', { name: /Pintura común/ })).toBeVisible()
+  await expect(page.getByRole('checkbox', { name: /Luz trailer/ })).toHaveCount(0)
+})
+
+test('el historial conserva la cotización de la clase borrada', async ({ page }) => {
+  await cambiar(page, 'cajas')
+  await page.getByRole('combobox', { name: 'Tipo de producto', exact: true }).selectOption('12')
+  await page.getByLabel('Nombre del cliente (opcional)').fill('Cliente conservado')
+  await page.getByRole('button', { name: 'Guardar cotización', exact: true }).click()
+  await page.getByRole('button', { name: 'Catálogo', exact: true }).click()
+  await page.getByRole('button', { name: 'Eliminar clase Cajas', exact: true }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Eliminar clase y sus datos', exact: true }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(selector(page)).toHaveValue('trailers')
+  await page.getByRole('button', { name: 'Historial', exact: true }).click()
+  await expect(page.getByText('Caja prueba', { exact: true })).toBeVisible()
+  await expect(page.getByText('Cliente conservado', { exact: false })).toBeVisible()
+  await page.getByRole('button', { name: /Duplicar/ }).click()
+  await expect(selector(page)).toHaveValue('universal')
+  await expect(page.getByRole('combobox', { name: 'Tipo de producto', exact: true })).toHaveValue('')
+})

@@ -3,9 +3,11 @@ import { formatoARS } from '../utils/formato'
 import { claseDe, nombreClase } from '../utils/clasesProductos'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/database'
+import { compararPor } from '../utils/ordenar'
 
 /**
- * Lista de variables agrupadas por categoría, con buscador y orden alfabético.
+ * Lista de variables agrupadas por categoría (A-Z), con buscador; dentro de
+ * cada categoría se ordenan según `orden` (ver utils/ordenar).
  * Las variables con `permiteCantidad` muestran un input numérico cuando están
  * seleccionadas (ej: cantidad de frenos, llantas, cubiertas, etc.).
  *
@@ -15,7 +17,7 @@ import { db } from '../db/database'
  * @param {(id: number) => void} props.onToggle
  * @param {(id: number, cantidad: string|number) => void} props.onCantidadChange
  */
-export default function SelectorVariables({ variables, clases = [], seleccionadas, onToggle, onCantidadChange }) {
+export default function SelectorVariables({ variables, clases = [], seleccionadas, onToggle, onCantidadChange, orden }) {
   const [busqueda, setBusqueda] = useState('')
   const busquedaId = useId()
   const registrosCategorias = useLiveQuery(() => db.categorias.toArray(), []) ?? []
@@ -27,8 +29,8 @@ export default function SelectorVariables({ variables, clases = [], seleccionada
           v.nombre.toLowerCase().includes(termino) || v.categoria.toLowerCase().includes(termino)
         )
       : variables
-    return [...base].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
-  }, [variables, busqueda])
+    return [...base].sort(compararPor(orden))
+  }, [variables, busqueda, orden])
 
   const categorias = useMemo(
     () => [...new Map(variablesFiltradas.map(v => [v.categoriaId ?? v.categoria, {

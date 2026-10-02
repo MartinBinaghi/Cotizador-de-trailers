@@ -7,6 +7,8 @@ import { formatoARS, NOTA_IVA } from '../utils/formato'
 import { variablesDesdeSeleccion } from '../utils/seleccionVariables'
 import { leerImagenComoDataUrl } from '../utils/imagenes'
 import SelectorVariables from '../components/SelectorVariables'
+import SelectorOrden from '../components/SelectorOrden'
+import { ordenar } from '../utils/ordenar'
 import CampoObservaciones from '../components/CampoObservaciones'
 import { CLASE_TRAILERS, perteneceAClase, claseDe, nombreClase } from '../utils/clasesProductos'
 import { useToast } from '../components/Toast'
@@ -37,6 +39,7 @@ export default function Comparativa({ claseId, clases }) {
   const [cuit, setCuit] = useState('')
   const [observaciones, setObservaciones] = useState('')
   const [borradorListo, setBorradorListo] = useState(false)
+  const [orden, setOrden] = useState('nombre-asc')
 
   useEffect(() => {
     getRedondeo().then(setRedondeoLocal)
@@ -66,6 +69,14 @@ export default function Comparativa({ claseId, clases }) {
     guardarBorrador('comparativa', 'borradorComparativa', claseId, { modelos, nombreCliente, razonSocial, cuit, observaciones })
       .catch(() => showToast('No se pudo guardar el borrador. Intentá nuevamente.', 'error'))
   }, [claseId, borradorListo, modelos, nombreCliente, razonSocial, cuit, observaciones])
+
+  function limpiarBorrador() {
+    setModelos([crearModelo('Opción 1'), crearModelo('Opción 2')])
+    setNombreCliente('')
+    setRazonSocial('')
+    setCuit('')
+    setObservaciones('')
+  }
 
   function agregarModelo() {
     setModelos(prev => [...prev, crearModelo(`Opción ${prev.length + 1}`)])
@@ -177,7 +188,12 @@ export default function Comparativa({ claseId, clases }) {
 
   return (
     <div className="page page-comparativa">
-      <h2 className="titulo-pagina">Comparativa de modelos</h2>
+      <div className="cotizador-encabezado">
+        <h2 className="titulo-pagina">Comparativa de modelos</h2>
+        <button type="button" className="btn-secundario" onClick={limpiarBorrador} disabled={!borradorListo}>
+          Limpiar borrador
+        </button>
+      </div>
       <p className="texto-ayuda">
         Armá dos o más configuraciones (distinto tipo de producto y/o variables) y
         compará los resultados lado a lado para mostrárselos al cliente.
@@ -205,12 +221,15 @@ export default function Comparativa({ claseId, clases }) {
         </div>
       </div>
 
+      <SelectorOrden value={orden} onChange={setOrden} />
+
       <div className="comparativa-modelos">
         {modelos.map(m => (
           <TarjetaModelo
             key={m.id}
             modelo={m}
-            tipos={tipos}
+            tipos={ordenar(tipos, orden)}
+            orden={orden}
             clases={clases}
             variables={variables}
             onCambiarNombre={nombre => actualizarModelo(m.id, { nombre })}
@@ -303,7 +322,7 @@ export default function Comparativa({ claseId, clases }) {
   )
 }
 
-function TarjetaModelo({ modelo, tipos, clases, variables, onCambiarNombre, onCambiarTipo, onToggleVariable, onCantidadChange, onCambiarImagen, onQuitarImagen, onEliminar }) {
+function TarjetaModelo({ modelo, tipos, orden, clases, variables, onCambiarNombre, onCambiarTipo, onToggleVariable, onCantidadChange, onCambiarImagen, onQuitarImagen, onEliminar }) {
   return (
     <div className="tarjeta-modelo">
       <div className="form-inline">
@@ -330,6 +349,7 @@ function TarjetaModelo({ modelo, tipos, clases, variables, onCambiarNombre, onCa
       <SelectorVariables
         variables={variables}
         clases={clases}
+        orden={orden}
         seleccionadas={modelo.seleccionadas}
         onToggle={onToggleVariable}
         onCantidadChange={onCantidadChange}

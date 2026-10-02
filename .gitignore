@@ -1,5 +1,7 @@
 .claude
 node_modules
+test-results/
+playwright-report/
 dist
 .agents
 skills-lock.json

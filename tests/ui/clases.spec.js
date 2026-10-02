@@ -91,7 +91,7 @@ test('alta de clases y productos toma la clase actual y permite Universal', asyn
   await tipos.getByPlaceholder('Precio base', { exact: true }).fill('500')
   await tipos.getByRole('button', { name: 'Agregar', exact: true }).click()
   await expect(tipos.getByText('Modelo nuevo', { exact: false })).toBeVisible()
-  await tipos.getByRole('button', { name: 'Editar', exact: true }).last().click()
+  await tipos.getByRole('listitem').filter({ hasText: 'Modelo nuevo' }).getByRole('button', { name: 'Editar', exact: true }).click()
   await tipos.getByRole('combobox', { name: 'Clase de producto', exact: true }).first().selectOption('universal')
   await tipos.getByRole('button', { name: 'Guardar', exact: true }).click()
   await cambiar(page, 'cajas')

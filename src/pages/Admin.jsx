@@ -8,20 +8,26 @@ import SelectorClase from '../components/SelectorClase'
 import AdminClases from '../components/AdminClases'
 import ExportarCatalogo from '../components/ExportarCatalogo'
 import AdminCategorias from '../components/AdminCategorias'
+import SelectorOrden from '../components/SelectorOrden'
+import { ordenar, compararPor } from '../utils/ordenar'
 import { useToast } from '../components/Toast'
 
 export default function Admin({ claseId, clases }) {
+  const [orden, setOrden] = useState('nombre-asc')
   return (
     <div className="page">
-      <h2 className="titulo-pagina">Administrar catálogo</h2>
+      <div className="cotizador-encabezado">
+        <h2 className="titulo-pagina">Administrar catálogo</h2>
+        <SelectorOrden value={orden} onChange={setOrden} />
+      </div>
       <div className="admin-grid">
         <AdminClases clases={clases} />
         <ExportarCatalogo />
         <BackupRestore />
         <AjustePreciosMasivo claseId={claseId} />
-        <AdminTiposTrailer claseId={claseId} clases={clases} />
-        <AdminCategorias claseId={claseId} clases={clases} />
-        <AdminVariables claseId={claseId} clases={clases} />
+        <AdminTiposTrailer claseId={claseId} clases={clases} orden={orden} />
+        <AdminCategorias claseId={claseId} clases={clases} orden={orden} />
+        <AdminVariables claseId={claseId} clases={clases} orden={orden} />
       </div>
     </div>
   )
@@ -161,7 +167,7 @@ function AjustePreciosMasivo({ claseId }) {
   )
 }
 
-function AdminTiposTrailer({ claseId, clases }) {
+function AdminTiposTrailer({ claseId, clases, orden }) {
   const tipos = useLiveQuery(() => db.tiposTrailer.filter(item => perteneceAClase(item, claseId)).toArray(), [claseId]) ?? []
   const showToast = useToast()
 
@@ -217,7 +223,7 @@ function AdminTiposTrailer({ claseId, clases }) {
     <section className="admin-seccion admin-seccion-ancha">
       <h3>Tipos de producto</h3>
       <ul className="lista-admin">
-        {tipos.map(t => (
+        {ordenar(tipos, orden).map(t => (
           <li className={editandoId === t.id ? '' : 'fila-tipo'} key={t.id}>
             {editandoId === t.id ? (
               <div className="form-inline">
@@ -254,7 +260,7 @@ function AdminTiposTrailer({ claseId, clases }) {
   )
 }
 
-function AdminVariables({ claseId, clases }) {
+function AdminVariables({ claseId, clases, orden }) {
   const variables = useLiveQuery(() => db.variables.filter(item => perteneceAClase(item, claseId)).toArray(), [claseId]) ?? []
   const categorias = useLiveQuery(() => db.categorias.toArray(), []) ?? []
   const showToast = useToast()
@@ -291,9 +297,9 @@ function AdminVariables({ claseId, clases }) {
     return [...filtradas].sort((a, b) => {
       const comparacionCategoria = a.categoria.localeCompare(b.categoria, 'es')
       if (comparacionCategoria !== 0) return comparacionCategoria
-      return a.nombre.localeCompare(b.nombre, 'es')
+      return compararPor(orden)(a, b)
     })
-  }, [variables, busquedaAdmin])
+  }, [variables, busquedaAdmin, orden])
 
   function esCategoriaDescuento(categoriaId) {
     return !!categorias.find(c => c.id === Number(categoriaId))?.esDescuento

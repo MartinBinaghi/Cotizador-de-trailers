@@ -7,6 +7,8 @@ import { formatoARS, NOTA_IVA } from '../utils/formato'
 import { normalizarSeleccionadas, serializarSeleccionadas, variablesDesdeSeleccion } from '../utils/seleccionVariables'
 import { leerImagenComoDataUrl } from '../utils/imagenes'
 import SelectorVariables from '../components/SelectorVariables'
+import SelectorOrden from '../components/SelectorOrden'
+import { ordenar } from '../utils/ordenar'
 import CampoObservaciones from '../components/CampoObservaciones'
 import { CLASE_TRAILERS, perteneceAClase, claseDe, nombreClase, seleccionVisible } from '../utils/clasesProductos'
 import { useToast } from '../components/Toast'
@@ -36,6 +38,7 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales, cl
   const [cargandoImagenes, setCargandoImagenes] = useState(false)
   const [versionFormulario, setVersionFormulario] = useState(0)
   const [borradorListo, setBorradorListo] = useState(false)
+  const [orden, setOrden] = useState('nombre-asc')
 
   useEffect(() => {
     getRedondeo().then(setRedondeoLocal)
@@ -250,11 +253,12 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales, cl
 
         <div className="grupo-campo">
           <span className="grupo-titulo">Configuración</span>
+          <SelectorOrden value={orden} onChange={setOrden} />
           <label className="campo">
             Tipo de producto
             <select value={tipoTrailerId} onChange={e => setTipoTrailerId(e.target.value)}>
               <option value="">Seleccionar...</option>
-              {tipos.map(t => (
+              {ordenar(tipos, orden).map(t => (
                 <option key={t.id} value={t.id}>{t.nombre} ({nombreClase(clases, claseDe(t))}) — {formatoARS.format(t.precioBase)}</option>
               ))}
             </select>
@@ -264,6 +268,7 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales, cl
             key={versionFormulario}
             variables={variables}
             clases={clases}
+            orden={orden}
             seleccionadas={seleccionadas}
             onToggle={toggleVariable}
             onCantidadChange={cambiarCantidad}

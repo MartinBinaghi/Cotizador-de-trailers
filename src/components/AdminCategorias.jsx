@@ -4,9 +4,10 @@ import { db } from '../db/database'
 import { claseDe, nombreClase, perteneceAClase } from '../utils/clasesProductos'
 import { guardarCategoria } from '../db/catalogo'
 import SelectorClase from './SelectorClase'
+import { ordenar } from '../utils/ordenar'
 import { useToast } from './Toast'
 
-export default function AdminCategorias({ claseId, clases }) {
+export default function AdminCategorias({ claseId, clases, orden }) {
   const categorias = useLiveQuery(() => db.categorias.filter(c => perteneceAClase(c, claseId)).toArray(), [claseId]) ?? []
   const vacia = () => ({ nombre: '', claseId, esDescuento: false })
   const [nueva, setNueva] = useState(vacia)
@@ -47,7 +48,7 @@ export default function AdminCategorias({ claseId, clases }) {
       <h3>Categorías</h3>
       <p className="texto-ayuda">Cada categoría admite variables de su clase. Las categorías Universal admiten variables de cualquier clase.</p>
       <ul className="lista-admin">
-        {categorias.map(cat => <li key={cat.id}>
+        {ordenar(categorias, orden).map(cat => <li key={cat.id}>
           {edicion?.id === cat.id ? <form className="form-inline" onSubmit={e => { e.preventDefault(); guardar(edicion) }}>
             {campos(edicion, setEdicion)}
             <button disabled={guardando}>Guardar</button>

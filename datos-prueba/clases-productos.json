@@ -1,0 +1,581 @@
+{
+  "version": 2,
+  "fechaExportacion": "2026-09-05T15:00:00.000Z",
+  "nota": "PRUEBA-CLASES-2026: datos ficticios, importación manual exclusivamente.",
+  "clasesProductos": [
+    {
+      "id": "trailers",
+      "nombre": "Trailers"
+    },
+    {
+      "id": "cajas",
+      "nombre": "Cajas"
+    },
+    {
+      "id": "universal",
+      "nombre": "Universal"
+    },
+    {
+      "id": "prueba-carrocerias",
+      "nombre": "PRUEBA Carrocerías"
+    }
+  ],
+  "tiposTrailer": [
+    {
+      "id": 101,
+      "nombre": "PRUEBA Trailer liviano",
+      "claseId": "trailers",
+      "precioBase": 1000000,
+      "ganancia": 1
+    },
+    {
+      "id": 102,
+      "nombre": "PRUEBA Trailer reforzado",
+      "claseId": "trailers",
+      "precioBase": 1500000,
+      "ganancia": 1.2
+    },
+    {
+      "id": 103,
+      "nombre": "PRUEBA Caja estándar",
+      "claseId": "cajas",
+      "precioBase": 2000000,
+      "ganancia": 1
+    },
+    {
+      "id": 104,
+      "nombre": "PRUEBA Caja cerrada",
+      "claseId": "cajas",
+      "precioBase": 2500000,
+      "ganancia": 1.2
+    },
+    {
+      "id": 105,
+      "nombre": "PRUEBA Plataforma compartida",
+      "claseId": "universal",
+      "precioBase": 800000,
+      "ganancia": 1
+    },
+    {
+      "id": 106,
+      "nombre": "PRUEBA Carrocería de reparto",
+      "claseId": "prueba-carrocerias",
+      "precioBase": 3000000,
+      "ganancia": 1
+    }
+  ],
+  "categorias": [
+    {
+      "id": 201,
+      "nombre": "PRUEBA Accesorios",
+      "claseId": "trailers",
+      "esDescuento": false
+    },
+    {
+      "id": 202,
+      "nombre": "PRUEBA Ejes y frenos",
+      "claseId": "trailers",
+      "esDescuento": false
+    },
+    {
+      "id": 203,
+      "nombre": "PRUEBA Homologación",
+      "claseId": "trailers",
+      "esDescuento": false
+    },
+    {
+      "id": 204,
+      "nombre": "PRUEBA Accesorios",
+      "claseId": "cajas",
+      "esDescuento": false
+    },
+    {
+      "id": 205,
+      "nombre": "PRUEBA Estructura",
+      "claseId": "cajas",
+      "esDescuento": false
+    },
+    {
+      "id": 206,
+      "nombre": "PRUEBA Terminación",
+      "claseId": "cajas",
+      "esDescuento": false
+    },
+    {
+      "id": 207,
+      "nombre": "PRUEBA Pintura",
+      "claseId": "universal",
+      "esDescuento": false
+    },
+    {
+      "id": 208,
+      "nombre": "PRUEBA Descuentos",
+      "claseId": "universal",
+      "esDescuento": true
+    },
+    {
+      "id": 209,
+      "nombre": "PRUEBA Servicios",
+      "claseId": "universal",
+      "esDescuento": false
+    },
+    {
+      "id": 210,
+      "nombre": "PRUEBA Equipamiento",
+      "claseId": "prueba-carrocerias",
+      "esDescuento": false
+    }
+  ],
+  "variables": [
+    {
+      "id": 301,
+      "categoriaId": 201,
+      "categoria": "PRUEBA Accesorios",
+      "claseId": "trailers",
+      "nombre": "PRUEBA Luz LED",
+      "valor": 10000,
+      "tipoModificador": "fijo",
+      "aplicaSobre": "base",
+      "ganancia": 1,
+      "permiteCantidad": true,
+      "esOpcional": true
+    },
+    {
+      "id": 302,
+      "categoriaId": 201,
+      "categoria": "PRUEBA Accesorios",
+      "claseId": "trailers",
+      "nombre": "PRUEBA Rueda de auxilio",
+      "valor": 80000,
+      "tipoModificador": "fijo",
+      "aplicaSobre": "base",
+      "ganancia": 1,
+      "permiteCantidad": false,
+      "esOpcional": true
+    },
+    {
+      "id": 303,
+      "categoriaId": 202,
+      "categoria": "PRUEBA Ejes y frenos",
+      "claseId": "trailers",
+      "nombre": "PRUEBA Eje reforzado",
+      "valor": 150000,
+      "tipoModificador": "fijo",
+      "aplicaSobre": "base",
+      "ganancia": 1,
+      "permiteCantidad": false,
+      "esOpcional": false
+    },
+    {
+      "id": 304,
+      "categoriaId": 202,
+      "categoria": "PRUEBA Ejes y frenos",
+      "claseId": "trailers",
+      "nombre": "PRUEBA Freno por rueda",
+      "valor": 50000,
+      "tipoModificador": "fijo",
+      "aplicaSobre": "base",
+      "ganancia": 1,
+      "permiteCantidad": true,
+      "esOpcional": false
+    },
+    {
+      "id": 305,
+      "categoriaId": 203,
+      "categoria": "PRUEBA Homologación",
+      "claseId": "trailers",
+      "nombre": "PRUEBA Homologación",
+      "valor": 10,
+      "tipoModificador": "porcentual",
+      "aplicaSobre": "base",
+      "ganancia": 1,
+      "permiteCantidad": false,
+      "esOpcional": false
+    },
+    {
+      "id": 306,
+      "categoriaId": 204,
+      "categoria": "PRUEBA Accesorios",
+      "claseId": "cajas",
+      "nombre": "PRUEBA Luz LED",
+      "valor": 25000,
+      "tipoModificador": "fijo",
+      "aplicaSobre": "base",
+      "ganancia": 1,
+      "permiteCantidad": true,
+      "esOpcional": true
+    },
+    {
+      "id": 307,
+      "categoriaId": 204,
+      "categoria": "PRUEBA Accesorios",
+      "claseId": "cajas",
+      "nombre": "PRUEBA Cajón de herramientas",
+      "valor": 100000,
+      "tipoModificador": "fijo",
+      "aplicaSobre": "base",
+      "ganancia": 1,
+      "permiteCantidad": false,
+      "esOpcional": true
+    },
+    {
+      "id": 308,
+      "categoriaId": 205,
+      "categoria": "PRUEBA Estructura",
+      "claseId": "cajas",
+      "nombre": "PRUEBA Piso reforzado",
+      "valor": 200000,
+      "tipoModificador": "fijo",
+      "aplicaSobre": "base",
+      "ganancia": 1,
+      "permiteCantidad": false,
+      "esOpcional": false
+    },
+    {
+      "id": 309,
+      "categoriaId": 205,
+      "categoria": "PRUEBA Estructura",
+      "claseId": "cajas",
+      "nombre": "PRUEBA Baranda desmontable",
+      "valor": 75000,
+      "tipoModificador": "fijo",
+      "aplicaSobre": "base",
+      "ganancia": 1,
+      "permiteCantidad": true,
+      "esOpcional": true
+    },
+    {
+      "id": 310,
+      "categoriaId": 206,
+      "categoria": "PRUEBA Terminación",
+      "claseId": "cajas",
+      "nombre": "PRUEBA Terminación premium",
+      "valor": 5,
+      "tipoModificador": "porcentual",
+      "aplicaSobre": "subtotal",
+      "ganancia": 1,
+      "permiteCantidad": false,
+      "esOpcional": false
+    },
+    {
+      "id": 311,
+      "categoriaId": 207,
+      "categoria": "PRUEBA Pintura",
+      "claseId": "universal",
+      "nombre": "PRUEBA Pintura negra",
+      "valor": 50000,
+      "tipoModificador": "fijo",
+      "aplicaSobre": "base",
+      "ganancia": 1,
+      "permiteCantidad": false,
+      "esOpcional": false
+    },
+    {
+      "id": 312,
+      "categoriaId": 207,
+      "categoria": "PRUEBA Pintura",
+      "claseId": "universal",
+      "nombre": "PRUEBA Pintura especial",
+      "valor": 90000,
+      "tipoModificador": "fijo",
+      "aplicaSobre": "base",
+      "ganancia": 1,
+      "permiteCantidad": false,
+      "esOpcional": true
+    },
+    {
+      "id": 313,
+      "categoriaId": 208,
+      "categoria": "PRUEBA Descuentos",
+      "claseId": "universal",
+      "nombre": "PRUEBA Pago de contado",
+      "valor": -5,
+      "tipoModificador": "porcentual",
+      "aplicaSobre": "subtotal",
+      "ganancia": 1,
+      "permiteCantidad": false,
+      "esOpcional": false
+    },
+    {
+      "id": 314,
+      "categoriaId": 208,
+      "categoria": "PRUEBA Descuentos",
+      "claseId": "universal",
+      "nombre": "PRUEBA Descuento comercial",
+      "valor": -10,
+      "tipoModificador": "porcentual",
+      "aplicaSobre": "subtotal",
+      "ganancia": 1,
+      "permiteCantidad": false,
+      "esOpcional": false
+    },
+    {
+      "id": 315,
+      "categoriaId": 209,
+      "categoria": "PRUEBA Servicios",
+      "claseId": "universal",
+      "nombre": "PRUEBA Entrega local",
+      "valor": 30000,
+      "tipoModificador": "fijo",
+      "aplicaSobre": "base",
+      "ganancia": 1,
+      "permiteCantidad": false,
+      "esOpcional": true
+    },
+    {
+      "id": 316,
+      "categoriaId": 209,
+      "categoria": "PRUEBA Servicios",
+      "claseId": "universal",
+      "nombre": "PRUEBA Servicio de montaje",
+      "valor": 60000,
+      "tipoModificador": "fijo",
+      "aplicaSobre": "base",
+      "ganancia": 1,
+      "permiteCantidad": false,
+      "esOpcional": false
+    },
+    {
+      "id": 317,
+      "categoriaId": 210,
+      "categoria": "PRUEBA Equipamiento",
+      "claseId": "prueba-carrocerias",
+      "nombre": "PRUEBA Estante interior",
+      "valor": 40000,
+      "tipoModificador": "fijo",
+      "aplicaSobre": "base",
+      "ganancia": 1,
+      "permiteCantidad": true,
+      "esOpcional": true
+    },
+    {
+      "id": 318,
+      "categoriaId": 210,
+      "categoria": "PRUEBA Equipamiento",
+      "claseId": "prueba-carrocerias",
+      "nombre": "PRUEBA Aislación interior",
+      "valor": 250000,
+      "tipoModificador": "fijo",
+      "aplicaSobre": "base",
+      "ganancia": 1,
+      "permiteCantidad": false,
+      "esOpcional": false
+    },
+    {
+      "id": 319,
+      "categoriaId": 209,
+      "categoria": "PRUEBA Servicios",
+      "claseId": "cajas",
+      "nombre": "PRUEBA Montaje exclusivo cajas",
+      "valor": 45000,
+      "tipoModificador": "fijo",
+      "aplicaSobre": "base",
+      "ganancia": 1,
+      "permiteCantidad": false,
+      "esOpcional": false
+    },
+    {
+      "id": 320,
+      "categoriaId": 209,
+      "categoria": "PRUEBA Servicios",
+      "claseId": "trailers",
+      "nombre": "PRUEBA Montaje exclusivo trailers",
+      "valor": 35000,
+      "tipoModificador": "fijo",
+      "aplicaSobre": "base",
+      "ganancia": 1,
+      "permiteCantidad": false,
+      "esOpcional": false
+    }
+  ],
+  "cotizaciones": [
+    {
+      "id": 401,
+      "tipoTrailerId": 101,
+      "claseId": "trailers",
+      "variablesSeleccionadas": [
+        {
+          "id": 301,
+          "cantidad": 2
+        },
+        {
+          "id": 304,
+          "cantidad": 2
+        },
+        {
+          "id": 311,
+          "cantidad": 1
+        },
+        {
+          "id": 313,
+          "cantidad": 1
+        }
+      ],
+      "precioFinal": 1111500,
+      "cliente": {
+        "nombreCliente": "PRUEBA Cliente trailer",
+        "razonSocial": "Cliente ficticio para pruebas",
+        "cuit": ""
+      },
+      "fecha": "2026-09-01T15:00:00.000Z",
+      "imagenes": [],
+      "observaciones": "DATOS FICTICIOS. Cotización de prueba, sin validez comercial.",
+      "snapshot": {
+        "tipoTrailerNombre": "PRUEBA Trailer liviano",
+        "base": 1000000,
+        "detalle": [
+          {
+            "id": 301,
+            "nombre": "PRUEBA Luz LED",
+            "monto": 20000,
+            "esOpcional": true,
+            "cantidad": 2
+          },
+          {
+            "id": 304,
+            "nombre": "PRUEBA Freno por rueda",
+            "monto": 100000,
+            "esOpcional": false,
+            "cantidad": 2
+          },
+          {
+            "id": 311,
+            "nombre": "PRUEBA Pintura negra",
+            "monto": 50000,
+            "esOpcional": false,
+            "cantidad": 1
+          },
+          {
+            "id": 313,
+            "nombre": "PRUEBA Pago de contado",
+            "monto": -58500,
+            "esOpcional": false,
+            "cantidad": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": 402,
+      "tipoTrailerId": 103,
+      "claseId": "cajas",
+      "variablesSeleccionadas": [
+        {
+          "id": 306,
+          "cantidad": 2
+        },
+        {
+          "id": 308,
+          "cantidad": 1
+        },
+        {
+          "id": 311,
+          "cantidad": 1
+        },
+        {
+          "id": 313,
+          "cantidad": 1
+        }
+      ],
+      "precioFinal": 2185000,
+      "cliente": {
+        "nombreCliente": "PRUEBA Cliente caja",
+        "razonSocial": "Cliente ficticio para pruebas",
+        "cuit": ""
+      },
+      "fecha": "2026-09-02T15:00:00.000Z",
+      "imagenes": [],
+      "observaciones": "DATOS FICTICIOS. Cotización de prueba, sin validez comercial.",
+      "snapshot": {
+        "tipoTrailerNombre": "PRUEBA Caja estándar",
+        "base": 2000000,
+        "detalle": [
+          {
+            "id": 306,
+            "nombre": "PRUEBA Luz LED",
+            "monto": 50000,
+            "esOpcional": true,
+            "cantidad": 2
+          },
+          {
+            "id": 308,
+            "nombre": "PRUEBA Piso reforzado",
+            "monto": 200000,
+            "esOpcional": false,
+            "cantidad": 1
+          },
+          {
+            "id": 311,
+            "nombre": "PRUEBA Pintura negra",
+            "monto": 50000,
+            "esOpcional": false,
+            "cantidad": 1
+          },
+          {
+            "id": 313,
+            "nombre": "PRUEBA Pago de contado",
+            "monto": -115000,
+            "esOpcional": false,
+            "cantidad": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": 403,
+      "tipoTrailerId": 106,
+      "claseId": "prueba-carrocerias",
+      "variablesSeleccionadas": [
+        {
+          "id": 311,
+          "cantidad": 1
+        },
+        {
+          "id": 317,
+          "cantidad": 3
+        },
+        {
+          "id": 318,
+          "cantidad": 1
+        }
+      ],
+      "precioFinal": 3420000,
+      "cliente": {
+        "nombreCliente": "PRUEBA Cliente carrocería",
+        "razonSocial": "Cliente ficticio para pruebas",
+        "cuit": ""
+      },
+      "fecha": "2026-09-03T15:00:00.000Z",
+      "imagenes": [],
+      "observaciones": "DATOS FICTICIOS. Cotización de prueba, sin validez comercial.",
+      "snapshot": {
+        "tipoTrailerNombre": "PRUEBA Carrocería de reparto",
+        "base": 3000000,
+        "detalle": [
+          {
+            "id": 311,
+            "nombre": "PRUEBA Pintura negra",
+            "monto": 50000,
+            "esOpcional": false,
+            "cantidad": 1
+          },
+          {
+            "id": 317,
+            "nombre": "PRUEBA Estante interior",
+            "monto": 120000,
+            "esOpcional": true,
+            "cantidad": 3
+          },
+          {
+            "id": 318,
+            "nombre": "PRUEBA Aislación interior",
+            "monto": 250000,
+            "esOpcional": false,
+            "cantidad": 1
+          }
+        ]
+      }
+    }
+  ],
+  "config": []
+}

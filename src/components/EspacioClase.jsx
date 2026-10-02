@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/database'
 import { CLASE_TRAILERS, CLASE_UNIVERSAL } from '../utils/clasesProductos'
 import SelectorClase from './SelectorClase'
+import { EnShell } from './Shell'
 import { useToast } from './Toast'
 
 // Cada pantalla guarda su selección; cambiarla descarta únicamente su borrador.
@@ -59,22 +60,24 @@ export default function EspacioClase({ pantalla, borrador, children }) {
   const claseActual = clases.some(c => c.id === claseId) ? claseId : CLASE_UNIVERSAL
   return (
     <div className="espacio-clase">
-      <div className="barra-clase">
-        <SelectorClase clases={clases} value={claseActual} onChange={valor => { if (valor !== claseActual) setClasePendiente(valor) }} disabled={cambiando} />
-        <p className="texto-ayuda">Se muestran los datos de esta clase y los universales.</p>
-      </div>
-      <div key={claseActual} inert={cambiando ? '' : undefined}>
+      <EnShell zona="clase">
+        <div className="barra-clase">
+          <SelectorClase clases={clases} value={claseActual} onChange={valor => { if (valor !== claseActual) setClasePendiente(valor) }} disabled={cambiando} />
+          <p className="barra-clase-ayuda">Incluye los datos universales.</p>
+        </div>
+      </EnShell>
+      <div key={claseActual} className="espacio-clase-contenido" inert={cambiando ? '' : undefined}>
         {children({ claseId: claseActual, clases })}
       </div>
-      <dialog ref={dialogo} className="dialogo-clase" aria-labelledby={tituloDialogoId} aria-describedby={descripcionDialogoId}
+      <dialog ref={dialogo} className="dialogo" aria-labelledby={tituloDialogoId} aria-describedby={descripcionDialogoId}
         onCancel={e => { e.preventDefault(); if (!cambiando) setClasePendiente(null) }}>
         <h3 id={tituloDialogoId}>Cambiar a {clases.find(c => c.id === clasePendiente)?.nombre}</h3>
         <p id={descripcionDialogoId}>{borrador
           ? 'Se vaciará el borrador de esta pantalla: cliente, configuración, imágenes y observaciones. Las cotizaciones guardadas se conservan.'
           : 'Se descartarán los cambios sin guardar de los formularios del catálogo.'}</p>
-        <div className="form-inline">
+        <div className="dialogo-acciones">
           <button type="button" className="btn-secundario" autoFocus disabled={cambiando} onClick={() => setClasePendiente(null)}>Cancelar</button>
-          <button type="button" disabled={cambiando} onClick={() => cambiarClase(clasePendiente)}>
+          <button type="button" className="btn-solido" disabled={cambiando} onClick={() => cambiarClase(clasePendiente)}>
             {cambiando ? 'Cambiando…' : 'Confirmar cambio de clase'}
           </button>
         </div>

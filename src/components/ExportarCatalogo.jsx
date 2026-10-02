@@ -33,12 +33,14 @@ export default function ExportarCatalogo() {
   }
 
   return (
-    <section className="admin-seccion admin-seccion-ancha">
-      <h3>Exportar catálogo a Excel</h3>
-      <p className="texto-ayuda">Incluye todas las clases, tipos de producto, categorías y variables en cuatro hojas, con sus precios y configuración.</p>
-      <button type="button" onClick={exportar} disabled={exportando}>
-        {exportando ? 'Exportando…' : 'Exportar catálogo completo (.xlsx)'}
-      </button>
-    </section>
+    <button
+      type="button"
+      className="btn-secundario"
+      onClick={exportar}
+      disabled={exportando}
+      title="Todas las clases, tipos de producto, categorías y variables en un libro de Excel"
+    >
+      {exportando ? 'Exportando…' : 'Exportar Excel'}
+    </button>
   )
 }

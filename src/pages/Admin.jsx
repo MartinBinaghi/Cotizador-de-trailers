@@ -1,36 +1,97 @@
-import { useState, useRef, useMemo } from 'react'
+import { useState, useRef, useMemo, useEffect, useId } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, exportarBackup, analizarBackup, combinarBackup, actualizarPreciosPorcentaje } from '../db/database'
 import { validarTipoTrailer } from '../utils/validaciones'
 import { claseDe, perteneceAClase, nombreClase } from '../utils/clasesProductos'
 import { guardarVariable } from '../db/catalogo'
+import { formatoARS } from '../utils/formato'
+import { guardarArchivo } from '../utils/guardarArchivo'
 import SelectorClase from '../components/SelectorClase'
 import AdminClases from '../components/AdminClases'
 import ExportarCatalogo from '../components/ExportarCatalogo'
 import AdminCategorias from '../components/AdminCategorias'
+import Inspector from '../components/Inspector'
 import SelectorOrden from '../components/SelectorOrden'
+import { EnShell } from '../components/Shell'
 import { ordenar, compararPor } from '../utils/ordenar'
 import { useToast } from '../components/Toast'
 
+const SECCIONES = [
+  { id: 'tipos', label: 'Tipos de producto', nuevo: '+ Nuevo tipo' },
+  { id: 'categorias', label: 'Categorías', nuevo: '+ Nueva categoría' },
+  { id: 'variables', label: 'Variables', nuevo: '+ Nueva variable' },
+  { id: 'clases', label: 'Clases' },
+  { id: 'ajuste', label: 'Ajuste masivo' }
+]
+
+const formatoGanancia = g => `×${(Number(g) || 1).toLocaleString('es-AR')}`
+
 export default function Admin({ claseId, clases }) {
   const [orden, setOrden] = useState('nombre-asc')
+  const [seccion, setSeccion] = useState('variables')
+  // Cada clic en "+ Nuevo..." incrementa el contador: la sección suelta la
+  // fila elegida y el inspector vuelve a un alta vacía.
+  const [nuevo, setNuevo] = useState(0)
+  const tipos = useLiveQuery(() => db.tiposTrailer.filter(item => perteneceAClase(item, claseId)).toArray(), [claseId]) ?? []
+  const categorias = useLiveQuery(() => db.categorias.filter(item => perteneceAClase(item, claseId)).toArray(), [claseId]) ?? []
+  const variables = useLiveQuery(() => db.variables.filter(item => perteneceAClase(item, claseId)).toArray(), [claseId]) ?? []
+  const conteos = { tipos: tipos.length, categorias: categorias.length, variables: variables.length, clases: clases.length }
+  const actual = SECCIONES.find(s => s.id === seccion)
+  const comunes = { claseId, clases, orden, setOrden, nuevo }
+
   return (
-    <div className="page">
-      <div className="cotizador-encabezado">
-        <h2 className="titulo-pagina">Administrar catálogo</h2>
-        <SelectorOrden value={orden} onChange={setOrden} />
+    <div className="pagina">
+      <div className="barra-pagina barra-pagina-con-pestanas">
+        <div className="barra-pagina-fila">
+          <div className="barra-pagina-titulo">
+            <h1>Catálogo</h1>
+            <span className="meta">Clase: {nombreClase(clases, claseId)}</span>
+          </div>
+          <div className="barra-pagina-acciones">
+            <ExportarCatalogo />
+            <BackupRestore />
+            {actual.nuevo && (
+              <button type="button" className="btn-primario" onClick={() => setNuevo(n => n + 1)}>{actual.nuevo}</button>
+            )}
+          </div>
+        </div>
+        <nav className="pestanas" aria-label="Secciones del catálogo">
+          {SECCIONES.map(s => (
+            <button
+              key={s.id}
+              type="button"
+              className="pestana"
+              aria-current={s.id === seccion ? 'page' : undefined}
+              onClick={() => setSeccion(s.id)}
+            >
+              {s.label}
+              {conteos[s.id] !== undefined && <span className="pestana-conteo">{conteos[s.id]}</span>}
+            </button>
+          ))}
+        </nav>
       </div>
-      <div className="admin-grid">
-        <AdminClases clases={clases} />
-        <ExportarCatalogo />
-        <BackupRestore />
-        <AjustePreciosMasivo claseId={claseId} />
-        <AdminTiposTrailer claseId={claseId} clases={clases} orden={orden} />
-        <AdminCategorias claseId={claseId} clases={clases} orden={orden} />
-        <AdminVariables claseId={claseId} clases={clases} orden={orden} />
+
+      <div className="pagina-cuerpo">
+        {seccion === 'tipos' && <AdminTiposTrailer tipos={tipos} {...comunes} />}
+        {seccion === 'categorias' && <AdminCategorias categorias={categorias} {...comunes} />}
+        {seccion === 'variables' && <AdminVariables variables={variables} {...comunes} />}
+        {seccion === 'clases' && <AdminClases clases={clases} />}
+        {seccion === 'ajuste' && <AjustePreciosMasivo claseId={claseId} />}
       </div>
+
+      <EnShell zona="estado">
+        <span>{variables.length} variables · {categorias.length} categorías · {tipos.length} tipos</span>
+        <span>Clase: {nombreClase(clases, claseId)}</span>
+      </EnShell>
     </div>
   )
+}
+
+/** Suelta la fila elegida cuando se pide un alta nueva desde la barra de la página. */
+function useSeleccion(nuevo) {
+  const [seleccion, setSeleccion] = useState(null)
+  useEffect(() => setSeleccion(null), [nuevo])
+  return [seleccion, setSeleccion]
 }
 
 function AjustePreciosMasivo({ claseId }) {
@@ -105,468 +166,482 @@ function AjustePreciosMasivo({ claseId }) {
   }
 
   return (
-    <section className="admin-seccion admin-seccion-ancha">
-      <h3>Ajuste masivo de precios</h3>
-      <p className="texto-ayuda">
-        Aumenta o disminuye de una sola vez el precio base y el valor fijo ($)
-        de los tipos de producto y variables que dejes marcados abajo. Las
-        variables en porcentaje (%) nunca se modifican. Se recomienda
-        descargar un backup antes de aplicar un ajuste masivo.
-      </p>
+    <section className="panel">
+      <h2 className="panel-titulo">Ajuste masivo de precios</h2>
+      <div className="panel-cuerpo pila">
+        <p className="texto-ayuda">
+          Aumenta o disminuye de una sola vez el precio base y el valor fijo ($)
+          de los tipos de producto y variables que dejes marcados abajo. Las
+          variables en porcentaje (%) nunca se modifican. Se recomienda
+          descargar un backup antes de aplicar un ajuste masivo.
+        </p>
 
-      <div className="checklist-ajuste">
-        <div className="checklist-ajuste-columna">
-          <div className="checklist-ajuste-cabecera">
-            <span>Tipos de producto</span>
-            <button type="button" className="btn-secundario" onClick={() => setTiposExcluidos(new Set())}>Todos</button>
-            <button type="button" className="btn-secundario" onClick={() => setTiposExcluidos(new Set(tiposOrdenados.map(t => t.id)))}>Ninguno</button>
+        <div className="checklist-ajuste">
+          <div className="checklist-ajuste-columna">
+            <div className="checklist-ajuste-cabecera">
+              <span>Tipos de producto</span>
+              <button type="button" className="btn-secundario btn-chico" onClick={() => setTiposExcluidos(new Set())}>Todos</button>
+              <button type="button" className="btn-secundario btn-chico" onClick={() => setTiposExcluidos(new Set(tiposOrdenados.map(t => t.id)))}>Ninguno</button>
+            </div>
+            {tiposOrdenados.map(t => (
+              <label key={t.id} className="checkbox-inline">
+                <input
+                  type="checkbox"
+                  checked={!tiposExcluidos.has(t.id)}
+                  onChange={() => toggle(setTiposExcluidos, t.id)}
+                />
+                {t.nombre}
+              </label>
+            ))}
           </div>
-          {tiposOrdenados.map(t => (
-            <label key={t.id} className="checkbox-inline">
-              <input
-                type="checkbox"
-                checked={!tiposExcluidos.has(t.id)}
-                onChange={() => toggle(setTiposExcluidos, t.id)}
-              />
-              {t.nombre}
-            </label>
-          ))}
+
+          <div className="checklist-ajuste-columna">
+            <div className="checklist-ajuste-cabecera">
+              <span>Variables (monto fijo)</span>
+              <button type="button" className="btn-secundario btn-chico" onClick={() => setVariablesExcluidas(new Set())}>Todas</button>
+              <button type="button" className="btn-secundario btn-chico" onClick={() => setVariablesExcluidas(new Set(variablesOrdenadas.map(v => v.id)))}>Ninguna</button>
+            </div>
+            {variablesOrdenadas.map(v => (
+              <label key={v.id} className="checkbox-inline">
+                <input
+                  type="checkbox"
+                  checked={!variablesExcluidas.has(v.id)}
+                  onChange={() => toggle(setVariablesExcluidas, v.id)}
+                />
+                <span className="texto-tenue">{v.categoria}</span> {v.nombre}
+              </label>
+            ))}
+          </div>
         </div>
 
-        <div className="checklist-ajuste-columna">
-          <div className="checklist-ajuste-cabecera">
-            <span>Variables (monto fijo)</span>
-            <button type="button" className="btn-secundario" onClick={() => setVariablesExcluidas(new Set())}>Todas</button>
-            <button type="button" className="btn-secundario" onClick={() => setVariablesExcluidas(new Set(variablesOrdenadas.map(v => v.id)))}>Ninguna</button>
-          </div>
-          {variablesOrdenadas.map(v => (
-            <label key={v.id} className="checkbox-inline">
-              <input
-                type="checkbox"
-                checked={!variablesExcluidas.has(v.id)}
-                onChange={() => toggle(setVariablesExcluidas, v.id)}
-              />
-              [{v.categoria}] {v.nombre}
-            </label>
-          ))}
+        <div className="form-inline">
+          <label className="campo">
+            Porcentaje
+            <input
+              type="number"
+              placeholder="Ej: 10 (aumenta) o -5 (baja)"
+              value={porcentaje}
+              onChange={e => setPorcentaje(e.target.value)}
+            />
+          </label>
+          <button type="button" className="btn-solido" onClick={aplicar} disabled={aplicando}>
+            {aplicando ? 'Aplicando...' : 'Aplicar ajuste'}
+          </button>
         </div>
-      </div>
-
-      <div className="form-inline">
-        <input
-          type="number"
-          placeholder="Ej: 10 (aumenta 10%) o -5 (baja 5%)"
-          value={porcentaje}
-          onChange={e => setPorcentaje(e.target.value)}
-        />
-        <button onClick={aplicar} disabled={aplicando}>
-          {aplicando ? 'Aplicando...' : 'Aplicar ajuste'}
-        </button>
       </div>
     </section>
   )
 }
 
-function AdminTiposTrailer({ claseId, clases, orden }) {
-  const tipos = useLiveQuery(() => db.tiposTrailer.filter(item => perteneceAClase(item, claseId)).toArray(), [claseId]) ?? []
+function AdminTiposTrailer({ tipos, claseId, clases, orden, setOrden, nuevo }) {
+  const [seleccion, setSeleccion] = useSeleccion(nuevo)
+  const actual = tipos.find(t => t.id === seleccion) ?? null
+
+  return (
+    <div className="maestro-detalle">
+      <section className="panel">
+        <div className="panel-cabecera">
+          <h2 className="panel-titulo">Tipos de producto</h2>
+          <SelectorOrden value={orden} onChange={setOrden} />
+        </div>
+        {tipos.length === 0 ? (
+          <p className="panel-vacio">Todavía no hay tipos de producto en esta clase.</p>
+        ) : (
+          <div className="tabla-scroll">
+            <table className="tabla tabla-catalogo">
+              <thead>
+                <tr>
+                  <th scope="col">Nombre</th>
+                  <th scope="col">Clase</th>
+                  <th scope="col" className="col-num">Precio base</th>
+                  <th scope="col" className="col-num">Ganancia</th>
+                  <th scope="col" className="col-num">Precio al cliente</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ordenar(tipos, orden).map(t => (
+                  <tr key={t.id} className={t.id === seleccion ? 'seleccionada' : undefined} onClick={() => setSeleccion(t.id)}>
+                    <td><button type="button" className="btn-fila" onClick={() => setSeleccion(t.id)}>{t.nombre}</button></td>
+                    <td><span className="etiqueta-clase">{nombreClase(clases, claseDe(t))}</span></td>
+                    <td className="col-num price-num">{formatoARS.format(t.precioBase)}</td>
+                    <td className="col-num price-num">{formatoGanancia(t.ganancia)}</td>
+                    <td className="col-num price-num">{formatoARS.format(t.precioBase * (Number(t.ganancia) || 1))}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+      <FormTipo
+        key={actual?.id ?? `nuevo-${nuevo}`}
+        tipo={actual}
+        claseId={claseId}
+        clases={clases}
+        enfocar={nuevo > 0 && !actual}
+        onCerrar={() => setSeleccion(null)}
+      />
+    </div>
+  )
+}
+
+function FormTipo({ tipo, claseId, clases, enfocar, onCerrar }) {
   const showToast = useToast()
-
-  const [claseNueva, setClaseNueva] = useState(claseId)
-  const [editClase, setEditClase] = useState(claseId)
-  const [nombre, setNombre] = useState('')
-  const [precioBase, setPrecioBase] = useState('')
-  const [ganancia, setGanancia] = useState('')
+  const vacio = { claseId, nombre: '', precioBase: '', ganancia: '' }
+  const [datos, setDatos] = useState(() => tipo
+    ? { claseId: claseDe(tipo), nombre: tipo.nombre, precioBase: String(tipo.precioBase), ganancia: String(tipo.ganancia ?? 1) }
+    : vacio)
   const [error, setError] = useState(null)
+  const cambiar = campo => e => { setDatos({ ...datos, [campo]: e.target.value }); setError(null) }
+  const precioCliente = Number(datos.precioBase) * (Number(datos.ganancia) || 1)
 
-  const [editandoId, setEditandoId] = useState(null)
-  const [editNombre, setEditNombre] = useState('')
-  const [editPrecio, setEditPrecio] = useState('')
-  const [editGanancia, setEditGanancia] = useState('')
-
-  async function agregar() {
-    const datos = { nombre, precioBase, ganancia }
+  async function guardar(e) {
+    e.preventDefault()
     const err = validarTipoTrailer(datos)
     if (err) { setError(err); return }
-    setError(null)
-    await db.tiposTrailer.add({ claseId: claseNueva, nombre: nombre.trim(), precioBase: Number(precioBase), ganancia: Number(ganancia) || 1 })
-    setClaseNueva(claseId)
-    setNombre('')
-    setPrecioBase('')
-    setGanancia('')
-    showToast('Tipo de producto agregado')
-  }
-
-  async function eliminar(id) {
-    if (confirm('¿Eliminar este tipo de producto?')) {
-      await db.tiposTrailer.delete(id)
-      showToast('Eliminado', 'info')
+    const registro = { claseId: datos.claseId, nombre: datos.nombre.trim(), precioBase: Number(datos.precioBase), ganancia: Number(datos.ganancia) || 1 }
+    if (tipo) {
+      await db.tiposTrailer.update(tipo.id, registro)
+      showToast('Cambios guardados')
+      onCerrar()
+    } else {
+      await db.tiposTrailer.add(registro)
+      setDatos(vacio)
+      showToast('Tipo de producto agregado')
     }
   }
 
-  function empezarEdicion(t) {
-    setEditClase(claseDe(t))
-    setEditandoId(t.id)
-    setEditNombre(t.nombre)
-    setEditPrecio(String(t.precioBase))
-    setEditGanancia(String(t.ganancia ?? 1))
-  }
-
-  async function guardarEdicion(id) {
-    const err = validarTipoTrailer({ nombre: editNombre, precioBase: editPrecio, ganancia: editGanancia })
-    if (err) { showToast(err, 'error'); return }
-    await db.tiposTrailer.update(id, { claseId: editClase, nombre: editNombre.trim(), precioBase: Number(editPrecio), ganancia: Number(editGanancia) || 1 })
-    setEditandoId(null)
-    showToast('Cambios guardados')
+  async function eliminar() {
+    if (confirm('¿Eliminar este tipo de producto?')) {
+      await db.tiposTrailer.delete(tipo.id)
+      showToast('Eliminado', 'info')
+      onCerrar()
+    }
   }
 
   return (
-    <section className="admin-seccion admin-seccion-ancha">
-      <h3>Tipos de producto</h3>
-      <ul className="lista-admin">
-        {ordenar(tipos, orden).map(t => (
-          <li className={editandoId === t.id ? '' : 'fila-tipo'} key={t.id}>
-            {editandoId === t.id ? (
-              <div className="form-inline">
-                <SelectorClase clases={clases} value={editClase} onChange={setEditClase} />
-                <input value={editNombre} onChange={e => setEditNombre(e.target.value)} />
-                <input type="number" value={editPrecio} onChange={e => setEditPrecio(e.target.value)} />
-                <input type="number" step="0.1" placeholder="Ganancia (ej: 1.2)" value={editGanancia} onChange={e => setEditGanancia(e.target.value)} />
-                <button onClick={() => guardarEdicion(t.id)}>Guardar</button>
-                <button className="btn-secundario" onClick={() => setEditandoId(null)}>Cancelar</button>
-              </div>
-            ) : (
-              <>
-                <span>{t.nombre} <span className="etiqueta-clase">{nombreClase(clases, claseDe(t))}</span></span>
-                <span className="price-num var-valor">${t.precioBase.toLocaleString('es-AR')}</span>
-                <span className="var-ganancia">×{t.ganancia ?? 1}</span>
-                <span className="acciones">
-                  <button className="btn-secundario" onClick={() => empezarEdicion(t)}>Editar</button>
-                  <button className="btn-peligro" onClick={() => eliminar(t.id)}>Eliminar</button>
-                </span>
-              </>
-            )}
-          </li>
-        ))}
-      </ul>
-      <div className="form-inline">
-        <SelectorClase clases={clases} value={claseNueva} onChange={setClaseNueva} />
-        <input placeholder="Nombre (ej: Batea)" value={nombre} onChange={e => setNombre(e.target.value)} />
-        <input placeholder="Precio base" type="number" value={precioBase} onChange={e => setPrecioBase(e.target.value)} />
-        <input placeholder="Ganancia (ej: 1.2)" type="number" step="0.1" value={ganancia} onChange={e => setGanancia(e.target.value)} />
-        <button onClick={agregar}>Agregar</button>
+    <Inspector
+      titulo={tipo ? tipo.nombre : 'Nuevo tipo de producto'}
+      onSubmit={guardar}
+      onCancelar={tipo ? onCerrar : null}
+      onEliminar={tipo ? eliminar : null}
+      error={error}
+      textoGuardar={tipo ? 'Guardar' : 'Agregar'}
+    >
+      <SelectorClase clases={clases} value={datos.claseId} onChange={valor => setDatos({ ...datos, claseId: valor })} />
+      <label className="campo">
+        Nombre
+        <input autoFocus={enfocar} value={datos.nombre} onChange={cambiar('nombre')} placeholder="Ej: Batea" />
+      </label>
+      <div className="grilla-2">
+        <label className="campo">
+          Precio base (costo)
+          <input type="number" className="input-num" value={datos.precioBase} onChange={cambiar('precioBase')} />
+        </label>
+        <label className="campo">
+          Ganancia
+          <input type="number" step="0.01" className="input-num" placeholder="Ej: 1.25" value={datos.ganancia} onChange={cambiar('ganancia')} />
+        </label>
       </div>
-      {error && <p className="error-texto">{error}</p>}
-    </section>
+      <div className="dato-calculado">
+        <span>Precio al cliente</span>
+        <span className="price-num">{datos.precioBase !== '' && Number.isFinite(precioCliente) ? formatoARS.format(precioCliente) : '—'}</span>
+      </div>
+    </Inspector>
   )
 }
 
-function AdminVariables({ claseId, clases, orden }) {
-  const variables = useLiveQuery(() => db.variables.filter(item => perteneceAClase(item, claseId)).toArray(), [claseId]) ?? []
+function AdminVariables({ variables, claseId, clases, orden, setOrden, nuevo }) {
+  const [seleccion, setSeleccion] = useSeleccion(nuevo)
+  const [busqueda, setBusqueda] = useState('')
+  const busquedaId = useId()
+  // Todas las categorías: el formulario puede mover la variable a otra clase.
   const categorias = useLiveQuery(() => db.categorias.toArray(), []) ?? []
-  const showToast = useToast()
-
-  const [guardandoVariable, setGuardandoVariable] = useState(false)
-  const [claseVariable, setClaseVariable] = useState(claseId)
-  const [claseCategoriaNueva, setClaseCategoriaNueva] = useState(claseId)
-  const [categoria, setCategoria] = useState('')
-  const [nombre, setNombre] = useState('')
-  const [tipoModificador, setTipoModificador] = useState('fijo')
-  const [valor, setValor] = useState('')
-  const [ganancia, setGanancia] = useState('')
-  const [aplicaSobre, setAplicaSobre] = useState('base')
-  const [permiteCantidad, setPermiteCantidad] = useState(false)
-  const [esOpcional, setEsOpcional] = useState(false)
-  const [error, setError] = useState(null)
-  const [mostrarNuevaCategoria, setMostrarNuevaCategoria] = useState(false)
-  const [nuevaCategoria, setNuevaCategoria] = useState('')
-  const [nuevaEsDescuento, setNuevaEsDescuento] = useState(false)
-  const [busquedaAdmin, setBusquedaAdmin] = useState('')
-
-  const [editandoId, setEditandoId] = useState(null)
-  const [editVar, setEditVar] = useState(null)
-
-  const categoriasExistentes = [...categorias].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+  const actual = variables.find(v => v.id === seleccion) ?? null
 
   const variablesOrdenadas = useMemo(() => {
-    const termino = busquedaAdmin.trim().toLowerCase()
+    const termino = busqueda.trim().toLowerCase()
     const filtradas = termino
       ? variables.filter(v =>
           v.nombre.toLowerCase().includes(termino) || v.categoria.toLowerCase().includes(termino)
         )
       : variables
-    return [...filtradas].sort((a, b) => {
-      const comparacionCategoria = a.categoria.localeCompare(b.categoria, 'es')
-      if (comparacionCategoria !== 0) return comparacionCategoria
-      return compararPor(orden)(a, b)
-    })
-  }, [variables, busquedaAdmin, orden])
+    const comparar = compararPor(orden)
+    return [...filtradas].sort((a, b) => a.categoria.localeCompare(b.categoria, 'es') || comparar(a, b))
+  }, [variables, busqueda, orden])
 
-  function esCategoriaDescuento(categoriaId) {
-    return !!categorias.find(c => c.id === Number(categoriaId))?.esDescuento
-  }
-
-  function cambiarClaseVariable(nuevaClase) {
-    setClaseVariable(nuevaClase)
-    if (!perteneceAClase(categorias.find(c => c.id === Number(categoria)) ?? {}, nuevaClase)) setCategoria('')
-    if (!perteneceAClase({ claseId: claseCategoriaNueva }, nuevaClase)) setClaseCategoriaNueva(nuevaClase)
-    setError(null)
-  }
-
-  function cambiarClaseEdicion(nuevaClase) {
-    const cat = categorias.find(c => c.id === Number(editVar.categoriaId))
-    setEditVar({ ...editVar, claseId: nuevaClase, categoriaId: cat && perteneceAClase(cat, nuevaClase) ? cat.id : '' })
-  }
-
-  async function agregar() {
-    setGuardandoVariable(true)
-    try {
-      await guardarVariable({
-        claseId: claseVariable, categoriaId: categoria, nombre, valor, tipoModificador,
-        ganancia, aplicaSobre, permiteCantidad, esOpcional
-      }, mostrarNuevaCategoria ? { nombre: nuevaCategoria, claseId: claseCategoriaNueva, esDescuento: nuevaEsDescuento } : null)
-      setCategoria('')
-      setNombre('')
-      setValor('')
-      setGanancia('')
-      setNuevaCategoria('')
-      setNuevaEsDescuento(false)
-      setMostrarNuevaCategoria(false)
-      setPermiteCantidad(false)
-      setEsOpcional(false)
-      setClaseVariable(claseId)
-      setClaseCategoriaNueva(claseId)
-      setError(null)
-      showToast('Variable agregada')
-    } catch (err) { setError(err.message) }
-    finally { setGuardandoVariable(false) }
-  }
-
-  async function eliminar(id) {
-    if (confirm('¿Eliminar esta variable?')) {
-      await db.variables.delete(id)
-      showToast('Eliminada', 'info')
-    }
-  }
-
-  function empezarEdicion(v) {
-    // Solo los descuentos porcentuales se editan en positivo (guardarVariable
-    // re-invierte el signo al guardar). El resto muestra su valor tal cual,
-    // para no convertir silenciosamente un valor negativo en positivo.
-    const esDescuentoPorcentual =
-      v.tipoModificador === 'porcentual' && esCategoriaDescuento(v.categoriaId)
-    setEditandoId(v.id)
-    setEditVar({
-      ...v,
-      valor: String(esDescuentoPorcentual ? Math.abs(v.valor) : v.valor),
-      ganancia: String(v.ganancia ?? 1),
-      permiteCantidad: !!v.permiteCantidad,
-      esOpcional: !!v.esOpcional
-    })
-  }
-
-  async function guardarEdicion(id) {
-    setGuardandoVariable(true)
-    try {
-      await guardarVariable({ ...editVar, id })
-      setEditandoId(null)
-      showToast('Cambios guardados')
-    } catch (err) { showToast(err.message, 'error') }
-    finally { setGuardandoVariable(false) }
+  function atributos(v) {
+    const lista = []
+    if (v.tipoModificador === 'porcentual') lista.push(v.aplicaSobre === 'subtotal' ? 'Sobre subtotal' : 'Sobre base')
+    if (v.permiteCantidad) lista.push('Admite cantidad')
+    if (v.esOpcional) lista.push('Opcional')
+    return lista.join(' · ') || '—'
   }
 
   return (
-    <section className="admin-seccion admin-seccion-ancha">
-      <h3>Variables</h3>
-      <p className="texto-ayuda">Elegí una categoría de la misma clase o Universal. Las variables Universal requieren una categoría Universal.</p>
-      <input
-        className="buscador-variables"
-        placeholder="Buscar variable por nombre o categoría..."
-        value={busquedaAdmin}
-        onChange={e => setBusquedaAdmin(e.target.value)}
-      />
-      {busquedaAdmin && variablesOrdenadas.length === 0 && (
-        <p className="texto-ayuda">Sin resultados para "{busquedaAdmin}".</p>
-      )}
-      <ul className="lista-admin">
-        {variablesOrdenadas.map(v => (
-          <li className={editandoId === v.id ? '' : 'fila-variable'} key={v.id}>
-            {editandoId === v.id ? (
-              <div className="form-inline">
-                <SelectorClase clases={clases} value={editVar.claseId} onChange={cambiarClaseEdicion} />
-                <select aria-label="Categoría de la variable" value={editVar.categoriaId} onChange={e => setEditVar({ ...editVar, categoriaId: Number(e.target.value) })}>
-                  <option value="">Seleccionar categoría...</option>
-                  {categoriasExistentes.filter(cat => perteneceAClase(cat, editVar.claseId)).map(cat => (
-                    <option key={cat.id} value={cat.id}>{cat.nombre} ({nombreClase(clases, claseDe(cat))})</option>
-                  ))}
-                </select>
-                <input value={editVar.nombre} onChange={e => setEditVar({ ...editVar, nombre: e.target.value })} />
-                <select value={editVar.tipoModificador} onChange={e => setEditVar({ ...editVar, tipoModificador: e.target.value })}>
-                  <option value="fijo">Monto fijo ($)</option>
-                  <option value="porcentual">Porcentaje (%)</option>
-                </select>
-                <input type="number" value={editVar.valor} onChange={e => setEditVar({ ...editVar, valor: e.target.value })} />
-                {editVar.tipoModificador === 'fijo' && (
-                  <input type="number" step="0.1" placeholder="Ganancia (ej: 1.2)" value={editVar.ganancia} onChange={e => setEditVar({ ...editVar, ganancia: e.target.value })} />
-                )}
-                {editVar.tipoModificador === 'porcentual' && (
-                  <select value={editVar.aplicaSobre} onChange={e => setEditVar({ ...editVar, aplicaSobre: e.target.value })}>
-                    <option value="base">% sobre base</option>
-                    <option value="subtotal">% sobre subtotal</option>
-                  </select>
-                )}
-                <label className="checkbox-inline">
-                  <input
-                    type="checkbox"
-                    checked={!!editVar.permiteCantidad}
-                    onChange={e => setEditVar({ ...editVar, permiteCantidad: e.target.checked })}
-                  />
-                  Permite cargar cantidad
-                </label>
-                <label className="checkbox-inline">
-                  <input
-                    type="checkbox"
-                    checked={!!editVar.esOpcional}
-                    onChange={e => setEditVar({ ...editVar, esOpcional: e.target.checked })}
-                  />
-                  Es opcional
-                </label>
-                <button disabled={guardandoVariable} onClick={() => guardarEdicion(v.id)}>Guardar</button>
-                <button className="btn-secundario" onClick={() => setEditandoId(null)}>Cancelar</button>
-              </div>
-            ) : (
-              <>
-                <span className="var-categoria">{v.categoria}</span>
-                <span>
-                  {v.nombre} <span className="etiqueta-clase">{nombreClase(clases, claseDe(v))}</span>
-                  {v.permiteCantidad && <span className="etiqueta-cantidad">admite cantidad</span>}
-                  {v.esOpcional && <span className="etiqueta-opcional">opcional</span>}
-                </span>
-                <span className="price-num var-valor">
-                  {v.tipoModificador === 'fijo' ? `$${v.valor.toLocaleString('es-AR')}` : `${v.valor >= 0 ? '+' : ''}${v.valor}%`}
-                </span>
-                <span className="var-ganancia">{v.tipoModificador === 'fijo' ? `×${v.ganancia ?? 1}` : '—'}</span>
-                <span className="acciones">
-                  <button className="btn-secundario" onClick={() => empezarEdicion(v)}>Editar</button>
-                  <button className="btn-peligro" onClick={() => eliminar(v.id)}>Eliminar</button>
-                </span>
-              </>
-            )}
-          </li>
-        ))}
-      </ul>
-      <div className="form-inline">
-        <SelectorClase clases={clases} value={claseVariable} onChange={cambiarClaseVariable} label="Clase de la variable" />
-        {mostrarNuevaCategoria ? (
-          <>
+    <div className="maestro-detalle">
+      <section className="panel">
+        <div className="panel-cabecera">
+          <h2 className="panel-titulo">Variables</h2>
+          <div className="grupo-filtros">
+            <label className="campo-oculto" htmlFor={busquedaId}>Buscar variable</label>
             <input
-              placeholder="Nueva categoría"
-              value={nuevaCategoria}
-              onChange={e => { setNuevaCategoria(e.target.value); setError(null) }}
-              autoFocus
+              id={busquedaId}
+              type="search"
+              className="input-busqueda"
+              placeholder="Buscar por nombre o categoría"
+              value={busqueda}
+              onChange={e => setBusqueda(e.target.value)}
             />
-            <SelectorClase clases={clases.filter(c => perteneceAClase({ claseId: c.id }, claseVariable))} value={claseCategoriaNueva} onChange={setClaseCategoriaNueva} label="Clase de la nueva categoría" />
-            <label className="checkbox-inline">
-              <input
-                type="checkbox"
-                checked={nuevaEsDescuento}
-                onChange={e => setNuevaEsDescuento(e.target.checked)}
-              />
-              Es de descuento
-            </label>
-            <button
-              className="btn-secundario"
-              onClick={() => { setNuevaCategoria(''); setNuevaEsDescuento(false); setCategoria(''); setMostrarNuevaCategoria(false) }}
-              type="button"
-            >
-              Cancelar
-            </button>
-          </>
+            <SelectorOrden value={orden} onChange={setOrden} />
+          </div>
+        </div>
+        {variablesOrdenadas.length === 0 ? (
+          <p className="panel-vacio">
+            {busqueda ? `Sin resultados para "${busqueda}".` : 'Todavía no hay variables en esta clase.'}
+          </p>
         ) : (
-          <select aria-label="Categoría de la nueva variable" value={categoria} onChange={e => {
-            setError(null)
-            if (e.target.value === '__nueva__') {
-              setNuevaCategoria('')
-              setMostrarNuevaCategoria(true)
-              setCategoria('')
-            } else {
-              setCategoria(e.target.value)
-              setMostrarNuevaCategoria(false)
-            }
-          }}>
+          <div className="tabla-scroll">
+            <table className="tabla tabla-catalogo">
+              <thead>
+                <tr>
+                  <th scope="col">Categoría</th>
+                  <th scope="col">Variable</th>
+                  <th scope="col">Clase</th>
+                  <th scope="col" className="col-num">Valor</th>
+                  <th scope="col" className="col-num">Ganancia</th>
+                  <th scope="col">Atributos</th>
+                </tr>
+              </thead>
+              <tbody>
+                {variablesOrdenadas.map(v => (
+                  <tr key={v.id} className={v.id === seleccion ? 'seleccionada' : undefined} onClick={() => setSeleccion(v.id)}>
+                    <td className="texto-suave">{v.categoria}</td>
+                    <td><button type="button" className="btn-fila" onClick={() => setSeleccion(v.id)}>{v.nombre}</button></td>
+                    <td><span className="etiqueta-clase">{nombreClase(clases, claseDe(v))}</span></td>
+                    <td className="col-num price-num">
+                      {v.tipoModificador === 'fijo' ? formatoARS.format(v.valor) : `${v.valor >= 0 ? '+' : '−'}${Math.abs(v.valor)} %`}
+                    </td>
+                    <td className="col-num price-num">{v.tipoModificador === 'fijo' ? formatoGanancia(v.ganancia) : '—'}</td>
+                    <td className="texto-suave">{atributos(v)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+      <FormVariable
+        key={actual?.id ?? `nuevo-${nuevo}`}
+        variable={actual}
+        categorias={categorias}
+        claseId={claseId}
+        clases={clases}
+        enfocar={nuevo > 0 && !actual}
+        onCerrar={() => setSeleccion(null)}
+      />
+    </div>
+  )
+}
+
+function FormVariable({ variable, categorias, claseId, clases, enfocar, onCerrar }) {
+  const showToast = useToast()
+  const vacio = {
+    claseId, categoriaId: '', nombre: '', tipoModificador: 'fijo', valor: '', ganancia: '',
+    aplicaSobre: 'base', permiteCantidad: false, esOpcional: false
+  }
+  const [datos, setDatos] = useState(() => {
+    if (!variable) return vacio
+    // Solo los descuentos porcentuales se editan en positivo (guardarVariable
+    // re-invierte el signo al guardar). El resto muestra su valor tal cual,
+    // para no convertir silenciosamente un valor negativo en positivo.
+    const esDescuentoPorcentual = variable.tipoModificador === 'porcentual' &&
+      !!categorias.find(c => c.id === variable.categoriaId)?.esDescuento
+    return {
+      claseId: claseDe(variable), categoriaId: variable.categoriaId ?? '', nombre: variable.nombre,
+      tipoModificador: variable.tipoModificador,
+      valor: String(esDescuentoPorcentual ? Math.abs(variable.valor) : variable.valor),
+      ganancia: String(variable.ganancia ?? 1), aplicaSobre: variable.aplicaSobre ?? 'base',
+      permiteCantidad: !!variable.permiteCantidad, esOpcional: !!variable.esOpcional
+    }
+  })
+  const [nuevaCategoria, setNuevaCategoria] = useState(null)
+  const [error, setError] = useState(null)
+  const [guardando, setGuardando] = useState(false)
+
+  const categoriasCompatibles = [...categorias]
+    .filter(cat => perteneceAClase(cat, datos.claseId))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+  const precioCliente = Number(datos.valor) * (Number(datos.ganancia) || 1)
+
+  function cambiar(cambios) {
+    setDatos(prev => ({ ...prev, ...cambios }))
+    setError(null)
+  }
+
+  function cambiarClase(nuevaClase) {
+    const categoria = categorias.find(c => c.id === Number(datos.categoriaId))
+    cambiar({ claseId: nuevaClase, categoriaId: categoria && perteneceAClase(categoria, nuevaClase) ? categoria.id : '' })
+    if (nuevaCategoria && !perteneceAClase({ claseId: nuevaCategoria.claseId }, nuevaClase)) {
+      setNuevaCategoria({ ...nuevaCategoria, claseId: nuevaClase })
+    }
+  }
+
+  async function guardar(e) {
+    e.preventDefault()
+    setGuardando(true)
+    try {
+      await guardarVariable(
+        { ...datos, id: variable?.id },
+        nuevaCategoria ? { nombre: nuevaCategoria.nombre, claseId: nuevaCategoria.claseId, esDescuento: nuevaCategoria.esDescuento } : null
+      )
+      if (variable) {
+        showToast('Cambios guardados')
+        onCerrar()
+      } else {
+        setDatos(vacio)
+        setNuevaCategoria(null)
+        setError(null)
+        showToast('Variable agregada')
+      }
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  async function eliminar() {
+    if (confirm('¿Eliminar esta variable?')) {
+      await db.variables.delete(variable.id)
+      showToast('Eliminada', 'info')
+      onCerrar()
+    }
+  }
+
+  return (
+    <Inspector
+      titulo={variable ? variable.nombre : 'Nueva variable'}
+      onSubmit={guardar}
+      onCancelar={variable ? onCerrar : null}
+      onEliminar={variable ? eliminar : null}
+      error={error}
+      guardando={guardando}
+      textoGuardar={guardando ? 'Guardando…' : variable ? 'Guardar' : 'Agregar'}
+    >
+      <label className="campo">
+        Nombre
+        <input autoFocus={enfocar} value={datos.nombre} onChange={e => cambiar({ nombre: e.target.value })} placeholder="Ej: 4 frenos" />
+      </label>
+      <div className="grilla-2">
+        <SelectorClase clases={clases} value={datos.claseId} onChange={cambiarClase} label="Clase de la variable" />
+        <label className="campo">
+          Categoría
+          <select
+            aria-label="Categoría de la variable"
+            value={nuevaCategoria ? '__nueva__' : datos.categoriaId}
+            onChange={e => {
+              setError(null)
+              if (e.target.value === '__nueva__') {
+                setNuevaCategoria({ nombre: '', claseId: datos.claseId, esDescuento: false })
+                cambiar({ categoriaId: '' })
+              } else {
+                setNuevaCategoria(null)
+                cambiar({ categoriaId: e.target.value === '' ? '' : Number(e.target.value) })
+              }
+            }}
+          >
             <option value="">Seleccionar categoría...</option>
-            {categoriasExistentes.filter(cat => perteneceAClase(cat, claseVariable)).map(cat => (
+            {categoriasCompatibles.map(cat => (
               <option key={cat.id} value={cat.id}>{cat.nombre} ({nombreClase(clases, claseDe(cat))})</option>
             ))}
             <option value="__nueva__">+ Agregar nueva categoría</option>
           </select>
-        )}
-        <input 
-          placeholder="Nombre (ej: 4 frenos)" 
-          value={nombre} 
-          onChange={e => { setNombre(e.target.value); setError(null) }}
-        />
-        <select value={tipoModificador} onChange={e => { setTipoModificador(e.target.value); setError(null) }}>
-          <option value="fijo">Monto fijo ($)</option>
-          <option value="porcentual">Porcentaje (%)</option>
-        </select>
-        <input
-          placeholder="Valor"
-          type="number"
-          value={valor}
-          onChange={e => { setValor(e.target.value); setError(null) }}
-        />
-        {tipoModificador === 'fijo' && (
-          <input
-            placeholder="Ganancia (ej: 1.2)"
-            type="number"
-            step="0.1"
-            value={ganancia}
-            onChange={e => { setGanancia(e.target.value); setError(null) }}
-          />
-        )}
-        {tipoModificador === 'porcentual' && (
-          <select value={aplicaSobre} onChange={e => { setAplicaSobre(e.target.value); setError(null) }}>
-            <option value="base">% sobre precio base</option>
-            <option value="subtotal">% sobre subtotal</option>
-          </select>
-        )}
-        <label className="checkbox-inline">
-          <input
-            type="checkbox"
-            checked={permiteCantidad}
-            onChange={e => setPermiteCantidad(e.target.checked)}
-          />
-          Permite cargar cantidad
         </label>
-        <label className="checkbox-inline">
-          <input
-            type="checkbox"
-            checked={esOpcional}
-            onChange={e => setEsOpcional(e.target.checked)}
-          />
-          Es opcional
-        </label>
-        <button disabled={guardandoVariable} onClick={agregar}>{guardandoVariable ? 'Guardando…' : 'Agregar'}</button>
       </div>
-      {error && <p className="error-texto">{error}</p>}
-    </section>
+      {nuevaCategoria && (
+        <fieldset className="subformulario">
+          <legend>Nueva categoría</legend>
+          <label className="campo">
+            Nombre de la nueva categoría
+            <input value={nuevaCategoria.nombre} onChange={e => { setNuevaCategoria({ ...nuevaCategoria, nombre: e.target.value }); setError(null) }} />
+          </label>
+          <SelectorClase
+            clases={clases.filter(c => perteneceAClase({ claseId: c.id }, datos.claseId))}
+            value={nuevaCategoria.claseId}
+            onChange={valor => setNuevaCategoria({ ...nuevaCategoria, claseId: valor })}
+            label="Clase de la nueva categoría"
+          />
+          <label className="checkbox-inline">
+            <input type="checkbox" checked={nuevaCategoria.esDescuento} onChange={e => setNuevaCategoria({ ...nuevaCategoria, esDescuento: e.target.checked })} />
+            Es de descuento
+          </label>
+          <button type="button" className="btn-secundario btn-chico" onClick={() => setNuevaCategoria(null)}>Usar una categoría existente</button>
+        </fieldset>
+      )}
+      <div className="grilla-2">
+        <label className="campo">
+          Tipo
+          <select value={datos.tipoModificador} onChange={e => cambiar({ tipoModificador: e.target.value })}>
+            <option value="fijo">Monto fijo ($)</option>
+            <option value="porcentual">Porcentaje (%)</option>
+          </select>
+        </label>
+        <label className="campo">
+          Valor
+          <input type="number" className="input-num" value={datos.valor} onChange={e => cambiar({ valor: e.target.value })} />
+        </label>
+        {datos.tipoModificador === 'fijo' ? (
+          <>
+            <label className="campo">
+              Ganancia
+              <input type="number" step="0.01" className="input-num" placeholder="Ej: 1.25" value={datos.ganancia} onChange={e => cambiar({ ganancia: e.target.value })} />
+            </label>
+            <div className="dato-calculado dato-calculado-celda">
+              <span>Precio al cliente</span>
+              <span className="price-num">{datos.valor !== '' && Number.isFinite(precioCliente) ? formatoARS.format(precioCliente) : '—'}</span>
+            </div>
+          </>
+        ) : (
+          <label className="campo">
+            Se aplica sobre
+            <select value={datos.aplicaSobre} onChange={e => cambiar({ aplicaSobre: e.target.value })}>
+              <option value="base">Precio base</option>
+              <option value="subtotal">Subtotal</option>
+            </select>
+          </label>
+        )}
+      </div>
+      <label className="checkbox-inline">
+        <input type="checkbox" checked={datos.permiteCantidad} onChange={e => cambiar({ permiteCantidad: e.target.checked })} />
+        Permite cargar cantidad
+      </label>
+      <label className="checkbox-inline">
+        <input type="checkbox" checked={datos.esOpcional} onChange={e => cambiar({ esOpcional: e.target.checked })} />
+        Es opcional
+      </label>
+    </Inspector>
   )
 }
 
 function BackupRestore() {
   const showToast = useToast()
   const inputRef = useRef(null)
+  const dialogo = useRef(null)
+  const tituloId = useId()
 
   async function exportar() {
-    const data = await exportarBackup()
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `backup-cotizador-trailers-${new Date().toISOString().slice(0, 10)}.json`
-    a.click()
-    URL.revokeObjectURL(url)
-    showToast('Backup descargado')
+    try {
+      const data = await exportarBackup()
+      // Diálogo nativo en la app instalada: el WebView no maneja descargas de <a download>.
+      const guardado = await guardarArchivo(new TextEncoder().encode(JSON.stringify(data, null, 2)), {
+        nombre: `backup-cotizador-trailers-${new Date().toISOString().slice(0, 10)}.json`,
+        mime: 'application/json', extension: 'json', descripcion: 'Backup del cotizador'
+      })
+      if (guardado) showToast('Backup guardado')
+    } catch (err) {
+      showToast(`No se pudo guardar el backup: ${err.message}`, 'error')
+    }
   }
 
   function elegirArchivo() {
@@ -612,6 +687,7 @@ function BackupRestore() {
       showToast(
         `Backup combinado: ${resumen.agregados} agregados, ${resumen.sobrescritos} sobrescritos, ${resumen.mantenidos} mantenidos sin cambios.`
       )
+      dialogo.current?.close()
     } catch (err) {
       showToast('No se pudo restaurar: ' + err.message, 'error')
     } finally {
@@ -620,25 +696,29 @@ function BackupRestore() {
   }
 
   return (
-    <section className="admin-seccion admin-seccion-ancha">
-      <h3>Backup y restauración</h3>
-      <p className="texto-ayuda">
-        Como todos los datos viven en esta computadora, se recomienda exportar
-        un backup periódicamente (por ejemplo, antes de una actualización o
-        un cambio de equipo). Al restaurar, los datos del backup se combinan
-        con los actuales: no se elimina nada de esta computadora.
-      </p>
-      <div className="form-inline">
-        <button onClick={exportar}>Descargar backup (JSON)</button>
-        <button className="btn-secundario" onClick={elegirArchivo}>Actualizar con backup</button>
+    <>
+      <button type="button" className="btn-secundario" onClick={() => dialogo.current?.showModal()}>Backup</button>
+      <dialog ref={dialogo} className="dialogo" aria-labelledby={tituloId}>
+        <h3 id={tituloId}>Backup y restauración</h3>
+        <p>
+          Como todos los datos viven en esta computadora, se recomienda exportar
+          un backup periódicamente (por ejemplo, antes de una actualización o
+          un cambio de equipo). Al restaurar, los datos del backup se combinan
+          con los actuales: no se elimina nada de esta computadora.
+        </p>
+        <div className="dialogo-acciones">
+          <button type="button" className="btn-secundario" onClick={() => dialogo.current?.close()}>Cerrar</button>
+          <button type="button" className="btn-secundario" onClick={elegirArchivo}>Actualizar con backup</button>
+          <button type="button" className="btn-solido" onClick={exportar}>Descargar backup (JSON)</button>
+        </div>
         <input
           type="file"
           accept="application/json"
           ref={inputRef}
-          style={{ display: 'none' }}
+          hidden
           onChange={onArchivoSeleccionado}
         />
-      </div>
-    </section>
+      </dialog>
+    </>
   )
 }

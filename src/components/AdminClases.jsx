@@ -60,21 +60,21 @@ export default function AdminClases({ clases }) {
   }
 
   return (
-    <section className="admin-seccion admin-seccion-ancha">
-      <h3>Clases de productos</h3>
-      <p className="texto-ayuda">Universal habilita un dato para todas las clases, incluidas las que crees después.</p>
-      <ul className="lista-admin">{clases.map(c => <li key={c.id}>
+    <section className="panel panel-angosto">
+      <h2 className="panel-titulo">Clases de productos</h2>
+      <p className="panel-nota">Universal habilita un dato para todas las clases, incluidas las que crees después.</p>
+      <ul className="lista-filas">{clases.map(c => <li key={c.id}>
         <span>{c.nombre}</span>
-        {c.id === CLASE_UNIVERSAL ? <span className="texto-ayuda">No se puede eliminar</span> :
-          <button type="button" className="btn-peligro" onClick={() => pedirEliminar(c)} aria-label={`Eliminar clase ${c.nombre}`}>Eliminar clase</button>}
+        {c.id === CLASE_UNIVERSAL ? <span className="texto-tenue">No se puede eliminar</span> :
+          <button type="button" className="btn-peligro btn-chico" onClick={() => pedirEliminar(c)} aria-label={`Eliminar clase ${c.nombre}`}>Eliminar clase</button>}
       </li>)}</ul>
-      <form className="form-inline" onSubmit={agregar}>
+      <form className="panel-cuerpo form-inline" onSubmit={agregar}>
         <label className="campo">Nueva clase
           <input value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Ej: Carrocerías" required />
         </label>
-        <button disabled={guardando}>{guardando ? 'Creando…' : 'Crear clase'}</button>
+        <button className="btn-solido" disabled={guardando}>{guardando ? 'Creando…' : 'Crear clase'}</button>
       </form>
-      <dialog ref={dialogo} className="dialogo-clase" aria-labelledby={tituloId} aria-describedby={descripcionId}
+      <dialog ref={dialogo} className="dialogo" aria-labelledby={tituloId} aria-describedby={descripcionId}
         onCancel={e => { e.preventDefault(); if (!eliminando) setPendiente(null) }}>
         <h3 id={tituloId}>Eliminar clase {pendiente?.nombre}</h3>
         <p id={descripcionId}>Se eliminarán esta clase y todos sus datos: tipos de producto ({pendiente?.resumen.tipos}),
@@ -82,7 +82,7 @@ export default function AdminClases({ clases }) {
           También se vaciarán los borradores de esta clase. Esta acción no se puede deshacer.</p>
         <p>Se conservan el historial de cotizaciones y los datos Universal. Las pantallas que usaban esta clase pasarán a Universal.</p>
         {error && <p className="error-texto" role="alert">{error}</p>}
-        <div className="form-inline">
+        <div className="dialogo-acciones">
           <button type="button" className="btn-secundario" autoFocus disabled={eliminando} onClick={() => setPendiente(null)}>Cancelar</button>
           <button type="button" className="btn-peligro" disabled={eliminando} onClick={confirmarEliminar}>
             {eliminando ? 'Eliminando…' : 'Eliminar clase y sus datos'}

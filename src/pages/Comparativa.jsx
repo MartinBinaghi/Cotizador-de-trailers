@@ -12,6 +12,7 @@ import { ordenar } from '../utils/ordenar'
 import CampoObservaciones from '../components/CampoObservaciones'
 import { CLASE_TRAILERS, perteneceAClase, claseDe, nombreClase } from '../utils/clasesProductos'
 import { useToast } from '../components/Toast'
+import { EnShell } from '../components/Shell'
 
 let contadorLocal = 0
 function nuevoId() {
@@ -114,7 +115,7 @@ export default function Comparativa({ claseId, clases }) {
   }
 
   function cambiarCantidad(modeloId, variableId, valor) {
-    const cantidad = Math.max(1, Math.floor(Number(valor)) || 1)
+    const cantidad = Math.min(999, Math.max(1, Math.floor(Number(valor)) || 1))
     setModelos(prev => prev.map(m => {
       if (m.id !== modeloId) return m
       return { ...m, seleccionadas: { ...m.seleccionadas, [variableId]: cantidad } }
@@ -187,164 +188,154 @@ export default function Comparativa({ claseId, clases }) {
   }
 
   return (
-    <div className="page page-comparativa">
-      <div className="cotizador-encabezado">
-        <h2 className="titulo-pagina">Comparativa de modelos</h2>
-        <button type="button" className="btn-secundario" onClick={limpiarBorrador} disabled={!borradorListo}>
-          Limpiar borrador
-        </button>
-      </div>
-      <p className="texto-ayuda">
-        Armá dos o más configuraciones (distinto tipo de producto y/o variables) y
-        compará los resultados lado a lado para mostrárselos al cliente.
-      </p>
-
-      <div className="form-card">
-        <div className="grupo-campo">
-          <span className="grupo-titulo">Datos del cliente</span>
-          <div className="fila-campos">
-            <label className="campo">
-              Nombre del cliente (opcional)
-              <input value={nombreCliente} onChange={e => setNombreCliente(e.target.value)} placeholder="Nombre del cliente" />
-            </label>
-
-            <label className="campo">
-              Razón social (opcional)
-              <input value={razonSocial} onChange={e => setRazonSocial(e.target.value)} placeholder="Razón social" />
-            </label>
-
-            <label className="campo">
-              CUIT (opcional)
-              <input value={cuit} onChange={e => setCuit(e.target.value)} placeholder="CUIT" />
-            </label>
-          </div>
+    <div className="pagina">
+      <div className="barra-pagina">
+        <div className="barra-pagina-titulo">
+          <h1>Comparativa de modelos</h1>
+          <span className="meta">{modelos.length} opci{modelos.length === 1 ? 'ón' : 'ones'}</span>
+        </div>
+        <div className="barra-pagina-acciones">
+          <SelectorOrden value={orden} onChange={setOrden} />
+          <button type="button" className="btn-secundario" onClick={limpiarBorrador} disabled={!borradorListo}>
+            Limpiar
+          </button>
+          <button type="button" className="btn-primario" onClick={descargarComparativaPdf}>Descargar PDF</button>
         </div>
       </div>
 
-      <SelectorOrden value={orden} onChange={setOrden} />
-
-      <div className="comparativa-modelos">
-        {modelos.map(m => (
-          <TarjetaModelo
-            key={m.id}
-            modelo={m}
-            tipos={ordenar(tipos, orden)}
-            orden={orden}
-            clases={clases}
-            variables={variables}
-            onCambiarNombre={nombre => actualizarModelo(m.id, { nombre })}
-            onCambiarTipo={tipoTrailerId => actualizarModelo(m.id, { tipoTrailerId })}
-            onToggleVariable={variableId => toggleVariable(m.id, variableId)}
-            onCantidadChange={(variableId, valor) => cambiarCantidad(m.id, variableId, valor)}
-            onCambiarImagen={file => cambiarImagen(m.id, file)}
-            onQuitarImagen={() => actualizarModelo(m.id, { imagen: null })}
-            onEliminar={modelos.length > 1 ? () => eliminarModelo(m.id) : null}
-          />
-        ))}
-      </div>
-
-      <div className="form-inline">
-        <button className="btn-secundario" onClick={agregarModelo}>+ Agregar modelo</button>
-      </div>
-
-      <div className="form-card">
-        <CampoObservaciones value={observaciones} onChange={setObservaciones} />
-      </div>
-
-      {hayAlgoParaComparar && (
-        <div className="resultado">
-          <div className="resultado-cabecera">
-            <h3>Comparación</h3>
-            <button className="btn-secundario" onClick={descargarComparativaPdf}>Descargar PDF</button>
+      <div className="pagina-cuerpo pila">
+        <section className="panel">
+          <h2 className="panel-titulo">Cliente</h2>
+          <div className="panel-cuerpo fila-campos">
+            <label className="campo">
+              Nombre del cliente
+              <input value={nombreCliente} onChange={e => setNombreCliente(e.target.value)} placeholder="Opcional" />
+            </label>
+            <label className="campo">
+              Razón social
+              <input value={razonSocial} onChange={e => setRazonSocial(e.target.value)} placeholder="Opcional" />
+            </label>
+            <label className="campo">
+              CUIT
+              <input value={cuit} onChange={e => setCuit(e.target.value)} placeholder="Opcional" />
+            </label>
           </div>
-          <div className="tabla-comparativa-wrapper">
-            <table className="tabla-comparativa">
-              <thead>
-                <tr>
-                  <th>Modelo</th>
-                  {filasComparativa.map(f => (
-                    <th key={f.modelo.id}>{f.modelo.nombre || 'Sin nombre'}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>Tipo de producto</td>
-                  {filasComparativa.map(f => (
-                    <td key={f.modelo.id}>{f.tipoTrailer?.nombre ?? '—'}</td>
-                  ))}
-                </tr>
-                <tr>
-                  <td>Precio estándar</td>
-                  {filasComparativa.map(f => (
-                    <td key={f.modelo.id} className={f.resultado ? 'price-num' : ''}>{f.resultado ? formatoARS.format(f.precioEstandar) : '—'}</td>
-                  ))}
-                </tr>
-                {variablesEnUso.map(v => (
-                  <tr key={v.id}>
-                    <td>{v.nombre}</td>
-                    {filasComparativa.map(f => {
-                      const seleccionada = f.variablesSeleccionadas.find(sv => sv.id === v.id)
-                      if (v.esOpcional) {
-                        const detalleItem = f.resultado?.detalle.find(d => d.id === v.id)
-                        return (
-                          <td key={f.modelo.id} className={detalleItem ? 'price-num' : ''}>{detalleItem ? formatoARS.format(detalleItem.monto) : '—'}</td>
-                        )
-                      }
-                      return (
-                        <td key={f.modelo.id}>
-                          {seleccionada
-                            ? (seleccionada.cantidad > 1 ? `Sí (x${seleccionada.cantidad})` : 'Sí')
-                            : '—'}
-                        </td>
-                      )
-                    })}
+        </section>
+
+        <div className="comparativa-modelos">
+          {modelos.map(m => (
+            <TarjetaModelo
+              key={m.id}
+              modelo={m}
+              tipos={ordenar(tipos, orden)}
+              orden={orden}
+              clases={clases}
+              variables={variables}
+              onCambiarNombre={nombre => actualizarModelo(m.id, { nombre })}
+              onCambiarTipo={tipoTrailerId => actualizarModelo(m.id, { tipoTrailerId })}
+              onToggleVariable={variableId => toggleVariable(m.id, variableId)}
+              onCantidadChange={(variableId, valor) => cambiarCantidad(m.id, variableId, valor)}
+              onCambiarImagen={file => cambiarImagen(m.id, file)}
+              onQuitarImagen={() => actualizarModelo(m.id, { imagen: null })}
+              onEliminar={modelos.length > 1 ? () => eliminarModelo(m.id) : null}
+            />
+          ))}
+          <button type="button" className="btn-agregar-columna" onClick={agregarModelo}>+ Agregar opción</button>
+        </div>
+
+        {hayAlgoParaComparar && (
+          <section className="panel" aria-label="Tabla comparativa">
+            <div className="tabla-scroll">
+              <table className="tabla tabla-comparativa">
+                <thead>
+                  <tr>
+                    <th scope="col">Comparación</th>
+                    {filasComparativa.map(f => (
+                      <th scope="col" key={f.modelo.id} className="col-num">{f.modelo.nombre || 'Sin nombre'}</th>
+                    ))}
                   </tr>
-                ))}
-                <tr className="fila-total">
-                  <td>Total</td>
-                  {filasComparativa.map(f => (
-                    <td key={f.modelo.id} className={f.resultado ? 'price-num' : ''}>
-                      {f.resultado ? (
-                        <>
-                          <strong>{formatoARS.format(f.resultado.precioFinal)}</strong> <span className="nota-iva">{NOTA_IVA}</span>
-                        </>
-                      ) : '—'}
-                    </td>
+                </thead>
+                <tbody>
+                  <tr>
+                    <th scope="row">Tipo de producto</th>
+                    {filasComparativa.map(f => (
+                      <td key={f.modelo.id} className="col-num">{f.tipoTrailer?.nombre ?? '—'}</td>
+                    ))}
+                  </tr>
+                  <tr>
+                    <th scope="row">Precio estándar</th>
+                    {filasComparativa.map(f => (
+                      <td key={f.modelo.id} className="col-num price-num">{f.resultado ? formatoARS.format(f.precioEstandar) : '—'}</td>
+                    ))}
+                  </tr>
+                  {variablesEnUso.map(v => (
+                    <tr key={v.id}>
+                      <th scope="row">{v.nombre}</th>
+                      {filasComparativa.map(f => {
+                        const seleccionada = f.variablesSeleccionadas.find(sv => sv.id === v.id)
+                        if (v.esOpcional) {
+                          const detalleItem = f.resultado?.detalle.find(d => d.id === v.id)
+                          return (
+                            <td key={f.modelo.id} className="col-num price-num">{detalleItem ? formatoARS.format(detalleItem.monto) : '—'}</td>
+                          )
+                        }
+                        return (
+                          <td key={f.modelo.id} className="col-num">
+                            {seleccionada
+                              ? (seleccionada.cantidad > 1 ? `Sí (x${seleccionada.cantidad})` : 'Sí')
+                              : <span className="texto-tenue">—</span>}
+                          </td>
+                        )
+                      })}
+                    </tr>
                   ))}
-                </tr>
-              </tbody>
-            </table>
+                  <tr className="fila-total">
+                    <th scope="row">Total <span className="nota-iva">{NOTA_IVA}</span></th>
+                    {filasComparativa.map(f => (
+                      <td key={f.modelo.id} className="col-num price-num">
+                        {f.resultado ? formatoARS.format(f.resultado.precioFinal) : '—'}
+                      </td>
+                    ))}
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
+
+        <section className="panel">
+          <h2 className="panel-titulo">Observaciones</h2>
+          <div className="panel-cuerpo">
+            <CampoObservaciones value={observaciones} onChange={setObservaciones} />
           </div>
-        </div>
-      )}
+        </section>
+      </div>
+
+      <EnShell zona="estado">
+        <span>{modelos.length} opci{modelos.length === 1 ? 'ón' : 'ones'}</span>
+        <span>{filasComparativa.filter(f => f.tipoTrailer).length} con producto elegido</span>
+        <span>Clase: {nombreClase(clases, claseId)}</span>
+      </EnShell>
     </div>
   )
 }
 
 function TarjetaModelo({ modelo, tipos, orden, clases, variables, onCambiarNombre, onCambiarTipo, onToggleVariable, onCantidadChange, onCambiarImagen, onQuitarImagen, onEliminar }) {
+  const nombre = modelo.nombre || 'Opción sin nombre'
   return (
-    <div className="tarjeta-modelo">
-      <div className="form-inline">
+    <section className="panel tarjeta-modelo" aria-label={nombre}>
+      <div className="tarjeta-modelo-cabecera">
         <input
-          placeholder="Nombre del modelo (ej: Opción A)"
+          className="input-nombre-modelo"
+          aria-label="Nombre de la opción"
+          placeholder="Nombre de la opción"
           value={modelo.nombre}
           onChange={e => onCambiarNombre(e.target.value)}
         />
         {onEliminar && (
-          <button className="btn-peligro" onClick={onEliminar} type="button">Quitar</button>
+          <button type="button" className="btn-icono" onClick={onEliminar} aria-label={`Quitar ${nombre}`} title="Quitar opción">×</button>
         )}
       </div>
-
-      <label className="campo">
-        Tipo de producto
-        <select value={modelo.tipoTrailerId} onChange={e => onCambiarTipo(e.target.value)}>
-          <option value="">Seleccionar...</option>
-          {tipos.map(t => (
-            <option key={t.id} value={t.id}>{t.nombre} ({nombreClase(clases, claseDe(t))}) — {formatoARS.format(t.precioBase)}</option>
-          ))}
-        </select>
-      </label>
 
       <SelectorVariables
         variables={variables}
@@ -353,35 +344,47 @@ function TarjetaModelo({ modelo, tipos, orden, clases, variables, onCambiarNombr
         seleccionadas={modelo.seleccionadas}
         onToggle={onToggleVariable}
         onCantidadChange={onCantidadChange}
-      />
+      >
+        <label className="campo campo-ancho">
+          Tipo de producto
+          <select value={modelo.tipoTrailerId} onChange={e => onCambiarTipo(e.target.value)}>
+            <option value="">Seleccionar...</option>
+            {tipos.map(t => (
+              <option key={t.id} value={t.id}>{t.nombre} ({nombreClase(clases, claseDe(t))}) — {formatoARS.format(t.precioBase)}</option>
+            ))}
+          </select>
+        </label>
+      </SelectorVariables>
 
-      <div className="campo">
-        <label>Imagen (opcional)</label>
-        <input
-          type="file"
-          accept="image/*"
-          onChange={e => {
-            onCambiarImagen(e.target.files?.[0])
-            e.target.value = ''
-          }}
-        />
-        {modelo.imagen && (
-          <div className="miniaturas-imagenes">
-            <div className="miniatura-imagen">
-              <img src={modelo.imagen} alt={`Imagen de ${modelo.nombre || 'modelo'}`} />
-              <button
-                type="button"
-                className="btn-quitar-imagen"
-                onClick={onQuitarImagen}
-                aria-label="Quitar imagen"
-                title="Quitar imagen"
-              >
-                ×
-              </button>
-            </div>
+      <div className="tarjeta-modelo-pie fila-imagenes">
+        {modelo.imagen ? (
+          <div className="miniatura-imagen">
+            <img src={modelo.imagen} alt={`Imagen de ${nombre}`} />
+            <button
+              type="button"
+              className="btn-quitar-imagen"
+              onClick={onQuitarImagen}
+              aria-label="Quitar imagen"
+              title="Quitar imagen"
+            >
+              ×
+            </button>
           </div>
+        ) : (
+          <label className="btn-archivo">
+            <input
+              type="file"
+              accept="image/*"
+              className="campo-oculto"
+              onChange={e => {
+                onCambiarImagen(e.target.files?.[0])
+                e.target.value = ''
+              }}
+            />
+            + Imagen
+          </label>
         )}
       </div>
-    </div>
+    </section>
   )
 }

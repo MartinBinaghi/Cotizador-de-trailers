@@ -1,17 +1,18 @@
 # Handoff — Cotizador de Trailers
 
 > Documento para retomar el proyecto en otra sesión/agente sin contexto previo.
-> Última actualización: 2026-08-08, HEAD en `3df90d8` ("arreglando bug de descarga"), versión de la app `0.1.7`.
+> Última actualización: 2026-10-02, HEAD en `554b134` ("algunos cambios minimos"), último release publicado `v0.1.9`.
+> **Ojo:** el bump a 0.1.9 todavía no está commiteado (ver "Pendientes").
 
 ## Qué es esto
 
 App de escritorio (React + Tauri) para que el personal administrativo de **BINA
-Maquinarias** arme cotizaciones de trailers a medida: elige un tipo de
-trailer base y le suma variables configurables (frenos, ejes, homologación,
-pintura, accesorios, descuentos), calcula el precio final, y lo exporta a
-PDF. Todo corre 100% local — sin backend, sin login, sin internet. Un único
-operador por instalación; los datos viven en IndexedDB dentro de esa
-máquina.
+Maquinarias** arme cotizaciones de productos a medida (trailers, cajas, etc.):
+elige una clase de producto y un tipo base, le suma variables configurables
+(frenos, ejes, homologación, pintura, accesorios, descuentos), calcula el precio
+final y lo exporta a PDF. Todo corre 100% local — sin backend, sin login, sin
+internet. Un único operador por instalación; los datos viven en IndexedDB
+dentro de esa máquina.
 
 Lectura obligatoria antes de tocar producto/UX: **`PRODUCT.md`** (propósito,
 usuarios, principios de producto — offline-first no negociable, backup nunca
@@ -24,16 +25,20 @@ Para el detalle de requerimientos funcionales: **`CHECKLIST_REQUERIMIENTOS.md`**
 - **Persistencia**: Dexie (wrapper de IndexedDB), `src/db/database.js`.
 - **Empaquetado desktop**: Tauri v2 (Rust), `src-tauri/`. Es la única forma de distribución real al cliente (ver `README.md` para el modo "PWA en navegador" alternativo, que existe pero es secundario).
 - **PDF**: jsPDF, cargado con `import()` dinámico (no infla el bundle inicial).
+- **Excel**: `exceljs` (exportar catálogo completo a `.xlsx`).
 - **PWA**: `vite-plugin-pwa` (service worker, manifest) — vive en paralelo al build de Tauri.
+- **Tests**: `node --test` + `fake-indexeddb` (unitarios) y Playwright con Edge (UI).
 
-## Cómo correr / compilar
+## Cómo correr / compilar / testear
 
 ```bash
 npm install
 npm run dev              # Vite dev server en localhost:5173 (navegador normal)
-npm run tauri:dev        # misma app pero dentro de la ventana de Tauri (WebView2)
-npm run build             # build de producción del frontend -> dist/
-npm run tauri:build       # instalador de escritorio completo (usa dist/, tarda varios minutos)
+npm run tauri:dev        # misma app pero dentro de la ventana de Tauri (WebView2); la 1ra vez compila Rust (varios min)
+npm run build            # build de producción del frontend -> dist/
+npm run tauri:build      # instalador de escritorio completo (usa dist/, tarda varios minutos)
+npm test                 # tests unitarios: tests/*.test.js
+npm run test:ui          # tests de UI Playwright: tests/ui/ (levanta Vite en 127.0.0.1:5187, usa Edge)
 ```
 
 **Importante**: "correr en localhost" (navegador real) y "correr en la app
@@ -45,186 +50,154 @@ empaquetado. Ver "Gotchas" más abajo.
 
 ```
 src/
-  db/database.js          -> Dexie: definición de tablas + migraciones versionadas + backup/restore
-  utils/calcularPrecio.js -> motor de cálculo de precio (única fuente de verdad, no duplicar en otras vistas)
-  utils/generarPdf.js     -> generación de PDF (cotización individual y comparativa) + guardado (ver gotcha de Tauri)
-  utils/seleccionVariables.js, validaciones.js, formato.js, imagenes.js
-  components/SelectorVariables.jsx, Toast.jsx, ErrorBoundary.jsx, CampoObservaciones.jsx
-  pages/Cotizador.jsx      -> pantalla principal: arma la cotización, layout de dos columnas (form + panel lateral con precio)
-  pages/Comparativa.jsx    -> compara varios tipos de trailer lado a lado, con borrador auto-guardado
-  pages/Admin.jsx          -> alta/baja/edición de tipos de trailer, categorías y variables; backup/restore; ajuste masivo de precios
+  db/database.js           -> Dexie: tablas + migraciones versionadas + borradores/redondeo
+  db/backup.js             -> exportarBackup / analizarBackup / combinarBackup (re-exportados desde database.js)
+  db/catalogo.js           -> guardarCategoria / guardarVariable (validan clase y categoría)
+  db/eliminarClase.js      -> borrado de una clase de producto (el historial conserva sus cotizaciones)
+  utils/calcularPrecio.js  -> motor de cálculo de precio (única fuente de verdad, no duplicar en otras vistas)
+  utils/clasesProductos.js -> constantes de clases y reglas (claseDe, perteneceAClase, validarClaseCategoria)
+  utils/ordenar.js         -> OPCIONES_ORDEN, compararPor, ordenar (selector "Ordenar por")
+  utils/generarPdf.js      -> PDF (cotización individual y comparativa)
+  utils/guardarArchivo.js  -> guardado de archivos: diálogo nativo en Tauri, descarga normal en navegador
+  utils/exportarCatalogoExcel.js, seleccionVariables.js, validaciones.js, formato.js, imagenes.js
+  components/SelectorVariables.jsx -> variables agrupadas por categoría, con buscador y prop `orden`
+  components/SelectorClase.jsx, SelectorOrden.jsx, EspacioClase.jsx, AdminClases.jsx, AdminCategorias.jsx,
+             ExportarCatalogo.jsx, CampoObservaciones.jsx, Toast.jsx, ErrorBoundary.jsx
+  pages/Cotizador.jsx      -> pantalla principal: form + panel lateral con precio; "Limpiar borrador"
+  pages/Comparativa.jsx    -> compara varios modelos lado a lado, borrador auto-guardado; "Limpiar borrador"
+  pages/Admin.jsx          -> Catálogo: clases, export Excel, backup, ajuste masivo, tipos, categorías, variables
   pages/Historial.jsx      -> cotizaciones guardadas: búsqueda, filtro por fecha, duplicar, exportar PDF
   App.jsx                  -> shell: header + nav de tabs + toggle de tema claro/oscuro
   index.css                -> design tokens (--paper, --ink, --accent*, --band*, etc.) por tema claro/oscuro
-  App.css                  -> todo el CSS de layout/componentes (623+ líneas), importado global
+  App.css                  -> todo el CSS de layout/componentes, importado global
 
 src-tauri/
   src/lib.rs               -> entry point Rust: registro de plugins (log, dialog, fs)
   tauri.conf.json          -> config de bundle, versión, ventana, recursos incluidos en el instalador
   capabilities/default.json -> permisos habilitados para el webview (core, dialog, fs)
   Cargo.toml               -> versión + dependencias Rust
+
+tests/                     -> unitarios (clasesProductos, eliminarClase, exportarCatalogoExcel, guardarArchivo, ordenar)
+tests/ui/clases.spec.js    -> flujo de clases end-to-end con Playwright
+datos-prueba/              -> catálogo "PRUEBA" para probar clases a mano (ver su LEEME.md). No se empaqueta.
 ```
 
 Otros archivos relevantes en la raíz:
 - `PRODUCT.md` — contexto de producto (ver arriba).
 - `CHECKLIST_REQUERIMIENTOS.md` — checklist funcional detallado, con líneas de código referenciadas.
-- `PLAN_REDISENO_ESCRITORIO.md` — plan de rediseño para aprovechar ancho de escritorio; **ya ejecutado** (el layout de dos columnas en Cotizador y `.page { max-width: 1200px }` en `App.css` son el resultado).
-- `datos-demo.json` — catálogo de ejemplo **ficticio** (inventado para poder mostrar/probar la app). No confundir con datos reales de BINA Maquinarias, no usar como evidencia de reglas de negocio reales.
-- `BINA MAQUINARIAS LOGO_2026_Mesa de trabajo 1 copia.png` — logo oficial del cliente, usado en header de la app y en el PDF.
-- `.impeccable/critique/` — reportes de auditorías de UX/diseño hechas con el skill `/impeccable` (histórico, ver sección más abajo).
+- `PLAN_REDISENO_ESCRITORIO.md` — plan de rediseño de escritorio; **ya ejecutado**.
+- `datos-demo.json` — catálogo de ejemplo **ficticio**. No usar como evidencia de reglas de negocio reales.
+- `BINA MAQUINARIAS LOGO_2026_Mesa de trabajo 1 copia.png` — logo oficial del cliente (header y PDF).
+- `.impeccable/critique/` — reportes de auditorías de UX/diseño hechas con el skill `/impeccable` (histórico).
 
 ## Modelo de datos (Dexie, `src/db/database.js`)
 
-Tablas: `tiposTrailer`, `categorias`, `variables`, `cotizaciones`, `config`
-(clave-valor, ej. redondeo del precio final, borrador de Comparativa).
+Tablas: `clasesProductos`, `tiposTrailer`, `categorias`, `variables`,
+`cotizaciones`, `config` (clave-valor: redondeo, borradores, clase
+seleccionada por pantalla).
 
 Migraciones ya aplicadas (no reordenar ni editar versiones viejas; agregar
-la próxima como `db.version(6)`):
+la próxima como `db.version(7)`):
 - v2: esquema base.
-- v3: separa `categorias` en tabla propia (antes vivían como string suelto en cada variable).
+- v3: separa `categorias` en tabla propia.
 - v4: `cliente` en cotizaciones pasa de string a objeto `{nombreCliente, razonSocial, cuit}`.
-- v5: `categorias` gana el flag `esDescuento` (reemplaza la heurística "el nombre contiene 'descuento'").
+- v5: `categorias` gana el flag `esDescuento`.
+- v6: **clases de productos**. Crea `clasesProductos` (Trailers, Cajas, Universal); agrega `claseId` a
+  tipos, categorías, variables y cotizaciones (lo existente pasa a Trailers); las variables se vinculan
+  por `categoriaId`; el nombre de categoría es único **por clase** (`&[claseId+nombre]`), no global.
 
-**Backup/restore** (`exportarBackup`/`analizarBackup`/`combinarBackup`):
-formato JSON `{version, fechaExportacion, tiposTrailer, categorias, variables, cotizaciones, config}`.
-El import **combina, nunca reemplaza**: separa registros nuevos de
-duplicados (por nombre normalizado, o categoría+nombre para variables) y
-pregunta antes de sobrescribir. Este comportamiento es un principio de
-producto explícito (ver `PRODUCT.md`), no cambiarlo sin confirmar con el
-usuario.
+**Clases**: un registro pertenece a su clase o a Universal (`perteneceAClase`).
+Universal se ve en todas las clases, incluidas las que se creen después. Una
+variable Universal exige categoría Universal (`validarClaseCategoria`). Cada
+pantalla recuerda su clase (`config` → `claseSeleccionada:<pantalla>`) y los
+borradores quedan atados a la clase (`guardarBorrador` no guarda si la
+pantalla ya cambió de clase).
+
+**Backup/restore**: formato JSON con todas las tablas. El import **combina,
+nunca reemplaza**: separa registros nuevos de duplicados y pregunta antes de
+sobrescribir. Es un principio de producto explícito (`PRODUCT.md`), no
+cambiarlo sin confirmar con el usuario.
 
 ## Motor de cálculo (`src/utils/calcularPrecio.js`)
 
-- `calcularPrecio(tipoTrailer, variables, redondeo)`: precio base + suma de
-  modificadores `fijo` (pueden tener `cantidad`) + modificadores
-  `porcentual` (aplicados sobre `base` o `subtotal` según cada variable).
-- `calcularPrecioConGanancia(...)`: corre `calcularPrecio` dos veces — una
-  para el costo real, otra sobre precios ya multiplicados por el margen de
-  ganancia (`ganancia` en tipoTrailer y en variables fijas) — así el % de
-  las variables porcentuales se calcula sobre el precio que ve el cliente,
-  no sobre el costo interno.
-- `desglosarEstandarYOpcionales(...)`: separa precio estándar (incluido) de
-  adicionales opcionales, usado en Cotizador y en los PDFs.
+- `calcularPrecio(tipoTrailer, variables, redondeo)`: precio base + modificadores `fijo` (con `cantidad`) +
+  modificadores `porcentual` (sobre `base` o `subtotal`).
+- `calcularPrecioConGanancia(...)`: corre `calcularPrecio` para el costo real y otra vez con precios ya
+  multiplicados por la `ganancia`, así el % se calcula sobre el precio que ve el cliente.
+- `desglosarEstandarYOpcionales(...)`: separa precio estándar de adicionales opcionales (Cotizador y PDFs).
 
-Cualquier vista nueva que muestre precio **debe** pasar por estas
-funciones — es el principio "el motor de precios es la única fuente de
-verdad" de `PRODUCT.md`.
+Cualquier vista nueva que muestre precio **debe** pasar por estas funciones.
 
-## Estado actual (2026-08-08)
+## Estado actual (2026-10-02)
 
-Versión: **0.1.7**, consistente en `package.json`, `src-tauri/tauri.conf.json`,
-`src-tauri/Cargo.toml` y `src-tauri/Cargo.lock` (este último se
-autorregenera con cada `cargo build`/`cargo check`, no hace falta tocarlo a
-mano). Todo está commiteado en `3df90d8` — `git status` da working tree
-limpio.
+Último release publicado: **v0.1.9** (GitHub, con `Cotizador.de.Trailers_0.1.9_x64-setup.exe`).
 
-### Los dos bugs de release que se arreglaron en esta sesión
+Funcionalidad agregada desde v0.1.7:
+- **v0.1.8**: botón "Limpiar borrador" en Cotizador (PR #6); clases de productos con Universal (PR #7);
+  exportar catálogo completo a Excel; tests unitarios y de UI.
+- **v0.1.9** (commit `554b134`):
+  - **"Ordenar por"** en Cotizador, Comparativa y Catálogo: Nombre (A-Z / Z-A) y Precio (menor→mayor /
+    mayor→menor). Lógica única en `utils/ordenar.js` + componente `SelectorOrden`. Ordena tipos de producto,
+    categorías (solo en Catálogo) y variables. En los selectores de variables y en la lista de variables del
+    Catálogo, las categorías siempre van A-Z y el orden se aplica dentro de cada una. Precio = `precioBase`
+    (tipos) o `valor` (variables; las porcentuales comparan el número del %). Empates por nombre.
+    El orden **no se persiste**: vuelve a A-Z al recargar.
+  - **"Limpiar borrador" en Comparativa**: igual que en Cotizador, sin confirmación. Vuelve a dos opciones
+    vacías y borra cliente y observaciones.
 
-1. **App instalada no abría — "WebView2Loader.dll no encontrado"**. Causa
-   raíz: un commit anterior (`1683283`) había quitado de
-   `src-tauri/tauri.conf.json` el bloque que bundlea esa dll dentro del
-   instalador:
-   ```json
-   "resources": { "target/release/WebView2Loader.dll": "" }
-   ```
-   Se sacó porque en una máquina sin builds previos el primer
-   `tauri:build` fallaba (la dll todavía no existe la primerísima vez, antes
-   de que `cargo build` la genere). La "solución" rompió el instalador para
-   todos los usuarios finales. **Fix**: se restauró el bloque `resources`.
-   Si alguna vez el primer build en una máquina nueva vuelve a fallar por
-   esto, correr `cargo build --release` una vez dentro de `src-tauri` (o
-   repetir `tauri:build`) y ya queda resuelto — es solo una molestia de la
-   primera compilación, nunca afecta a los usuarios.
+## Pendientes
 
-2. **Los PDF no se descargaban en la app instalada** (sí andaban en
-   localhost/navegador). Causa raíz: `jsPDF.save()` arma un blob + un
-   `<a download>` y lo clickea programáticamente — un navegador real lo
-   intercepta con su gestor de descargas, pero el WebView2 embebido de
-   Tauri no tiene un manejador de descargas por defecto, así que el click
-   no hacía nada, en silencio. **Fix**: se agregaron los plugins oficiales
-   `@tauri-apps/plugin-dialog` y `@tauri-apps/plugin-fs` (+ `@tauri-apps/api`
-   como dependencia directa), registrados en `src-tauri/src/lib.rs` y
-   habilitados en `src-tauri/capabilities/default.json`
-   (`dialog:default`, `fs:default`, `fs:allow-write-file`). En
-   `src/utils/generarPdf.js` se agregó `guardarPdf(doc, nombreArchivo)`:
-   si `isTauri()` es true, abre el diálogo nativo "Guardar como" y escribe
-   el archivo con `writeFile`; si no (dev/navegador), sigue usando
-   `doc.save()` como antes. Los dos `doc.save(...)` originales (cotización
-   individual y comparativa) ahora llaman a este helper.
+1. **Commitear el bump 0.1.9.** `package.json`, `package-lock.json`, `src-tauri/tauri.conf.json`,
+   `src-tauri/Cargo.toml` y `src-tauri/Cargo.lock` dicen 0.1.9 en el working tree pero no están commiteados.
+   El tag `v0.1.9` apunta a `554b134`, donde esos archivos dicen 0.1.8 (el instalador publicado sí es 0.1.9,
+   porque se compiló desde el working tree). Commitear y, si el usuario quiere, mover el tag
+   (`git tag -f v0.1.9 && git push -f origin v0.1.9`) — confirmar antes, reescribe un tag publicado.
+2. Probar el instalador en una máquina limpia (o reinstalando): que abra y que "Descargar PDF" funcione
+   en Cotizador, Historial y Comparativa.
+3. "Botón de descarga" que el usuario mencionó hace tiempo: no está en este repo, probablemente en un sitio
+   externo. Falta que el usuario diga dónde está.
+4. Ideas opcionales, no pedidas: persistir el orden elegido; tope de cantidad 999 en Comparativa
+   (`cambiarCantidad` no lo tiene; Cotizador sí).
 
-Ambos fixes están verificados con `npm run build` (frontend) y
-`cargo check` / `cargo build --release` (Rust) limpios, y la dll ya está
-presente en `target/release/`.
+## Flujo de release
 
-### Pendiente para cerrar el release 0.1.7
-
-- **No se corrió `npm run tauri:build` todavía** (el instalador final con
-  ambos fixes no se generó en esta sesión — solo se compiló el binario
-  Rust suelto para validar). Es el próximo paso antes de redistribuir al
-  cliente.
-- Después de generar el instalador, probarlo en una máquina limpia (o al
-  menos reinstalar sobre una existente) y confirmar en la app instalada
-  real: (a) que abre sin el error de WebView2Loader, (b) que "Descargar
-  PDF" en Cotizador/Historial/Comparativa abre el diálogo nativo y guarda
-  el archivo correctamente.
-- El usuario mencionó un "botón de descarga" (para que los usuarios
-  bajen/instalen la app) que "no hace nada" — **no se encontró en este
-  repo** ningún botón de ese tipo (solo hay botones de "Descargar PDF",
-  que son otra cosa y ya están cubiertos arriba). Es probable que viva en
-  un sitio/página externa (no versionada acá) desde donde se distribuye el
-  instalador. Falta confirmar con el usuario dónde está para poder
-  revisarlo.
+1. Subir la versión en los 5 archivos de arriba (en `Cargo.lock` solo la entrada `name = "app"`).
+2. Commit + push.
+3. `npm run tauri:build`.
+4. `git tag vX.Y.Z && git push origin vX.Y.Z`.
+5. `gh release create vX.Y.Z "src-tauri/target/release/bundle/nsis/Cotizador de Trailers_X.Y.Z_x64-setup.exe" --title "Cotizador vX.Y.Z" --generate-notes`
+   (se adjunta solo el `-setup.exe`, no el `.msi`).
 
 ## Gotchas conocidos
 
-- **`src-tauri/Cargo.lock`**: se deja sin tocar a mano en los bumps de
-  versión — se autorregenera solo con `cargo build`/`cargo check`/
-  `tauri:build`. Si un bump de versión no corrió ningún build de Rust
-  después, puede quedar desactualizado (no rompe nada, solo hay que
-  recordar correr `cargo check` antes de dar por cerrado el bump).
-- **`datos-demo.json`** es ficticio (inventado para demos). Si aparece una
-  aparente inconsistencia de reglas de negocio (ej. dos variables
-  mutuamente excluyentes que el modelo actual deja seleccionar juntas), es
-  muy probable que sea un artefacto de datos falsos y no un bug real —
-  confirmar con el usuario antes de "arreglarlo".
-- **Localhost (navegador) ≠ app instalada (WebView2)**: cualquier feature
-  que dependa de comportamiento estándar de navegador (descargas, clipboard,
-  notificaciones, etc.) hay que probarla en la app empaquetada, no alcanza
-  con probarla en `npm run dev`. Ver el bug de PDF de arriba como ejemplo
-  concreto.
-- **Tokens de tema** (`src/index.css`): hay pares de variables que se
-  re-tematizan juntas en modo oscuro (ej. `--accent-soft` +
-  `--accent-ink`, ambas terminan oscuras) — si se usan mal emparejadas
-  (ej. texto `--accent-ink` sobre fondo `--accent-soft`) el contraste
-  colapsa en dark mode aunque se vea bien en claro. El par seguro para
-  texto sobre fondos temáticos es `--ink` (invierte correctamente en ambos
-  temas). Ya hubo un bug así en la fila de TOTAL de Comparativa, corregido.
+- **WebView2Loader.dll**: `tauri.conf.json` debe conservar `"resources": { "target/release/WebView2Loader.dll": "" }`.
+  Sacarlo rompe la app instalada. Si el primer build en una máquina nueva falla porque la dll no existe,
+  correr `cargo build --release` en `src-tauri` una vez y repetir.
+- **Localhost (navegador) ≠ app instalada (WebView2)**: descargas, clipboard, etc. hay que probarlas en la app
+  empaquetada. Por eso los archivos se guardan con el diálogo nativo de Tauri (`plugin-dialog` + `plugin-fs`)
+  y no con `<a download>`.
+- **`src-tauri/Cargo.lock`** se autorregenera con cualquier build de Rust; en un bump alcanza con editar la
+  entrada de la app o correr `cargo check`.
+- **`datos-demo.json` y `datos-prueba/`** son ficticios. Una aparente inconsistencia de reglas de negocio ahí
+  probablemente sea artefacto de datos falsos: confirmar con el usuario antes de "arreglarla".
+- **Tokens de tema** (`src/index.css`): `--accent-soft` + `--accent-ink` se oscurecen juntas en modo oscuro;
+  para texto sobre fondos temáticos usar `--ink`.
+- **Tests de UI y orden de listas**: las listas ahora se ordenan (A-Z por defecto), así que los tests deben
+  ubicar filas por texto (`getByRole('listitem').filter({ hasText })`), no con `.last()`/`.first()`.
 
 ## Sesiones anteriores relevantes (para no repetir trabajo)
 
-- Se corrió `/impeccable init` (genera `PRODUCT.md`) y `/impeccable critique`
-  sobre `src/pages/Cotizador.jsx` (reporte persistido en
-  `.impeccable/critique/2026-07-25T23-01-50Z__src-pages-cotizador-jsx.md`,
-  score 21/40). De los hallazgos, el usuario **descartó explícitamente**
-  el P1 (checkboxes de frenos contradictorios — era artefacto de
-  `datos-demo.json`, no bug real) y un P2 sobre jerarquía del panel de
-  costo/margen (decidió dejarlo como está). Los demás se implementaron:
-  tope de cantidad (999) en variables, tamaño de fuente de labels chicas
-  (0.72rem → 0.8rem), label accesible en el buscador de variables, mensaje
-  de error genérico en `ErrorBoundary` (con detalle técnico colapsado en
-  `<details>`).
-- Se creó `datos-demo.json` para que el usuario pueda mostrar el programa
-  con datos de ejemplo realistas (vía "Actualizar con backup" en Admin).
-- Se ejecutó el plan de `PLAN_REDISENO_ESCRITORIO.md` (layout de dos
-  columnas en Cotizador, anchos ampliados para pantalla de escritorio).
+- `/impeccable init` + `/impeccable critique` sobre Cotizador (reporte en `.impeccable/critique/`). El usuario
+  descartó el P1 (frenos contradictorios, artefacto de `datos-demo.json`) y un P2 de jerarquía del panel de
+  costo/margen. El resto se implementó (tope 999, tamaño de labels, label del buscador, ErrorBoundary genérico).
+- Se ejecutó `PLAN_REDISENO_ESCRITORIO.md` (layout de dos columnas).
+- v0.1.7: fixes de release (WebView2Loader.dll y PDF con diálogo nativo).
+- 2026-10-02: "Ordenar por" y "Limpiar borrador" en Comparativa; release v0.1.9; actualización de este handoff.
 
-## Preferencias de trabajo del usuario (para la próxima sesión)
+## Preferencias de trabajo del usuario
 
-- Los mensajes del usuario suelen ser directivas breves en español; conviene
-  responder también en español y ser concreto/accionable.
-- El usuario corrige activamente hallazgos de auditorías cuando están
-  basados en datos ficticios o no los entiende — vale la pena confirmar
-  antes de implementar un fix "de diseño" que dependa de datos de ejemplo.
-- Ante bugs de build/release, el patrón esperado es: diagnosticar la causa
-  raíz (no solo el síntoma reportado), aplicar el fix mínimo, verificar con
-  build/compilación real antes de reportar como resuelto.
+- Mensajes breves en español; responder en español, concreto y accionable.
+- El usuario hace los commits él mismo; pedirle o pasarle los comandos en vez de commitear sin que lo pida.
+- Corrige hallazgos basados en datos ficticios: confirmar antes de implementar fixes "de diseño" que dependan
+  de datos de ejemplo.
+- Ante bugs de build/release: causa raíz, fix mínimo, verificar con build/tests reales antes de darlo por resuelto.

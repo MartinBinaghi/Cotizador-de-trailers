@@ -1,94 +1,87 @@
+/*
+ * Tokens del diseño "Ventana de trabajo": chrome grafito (barra de título,
+ * barra lateral, barra de estado), contenido claro y amarillo BINA solo para
+ * la acción principal y el total.
+ * Escala tipográfica fija: 12 / 14 / 18 / 26 px.
+ */
 :root {
-  --paper: #F6F4EE;
+  --paper: #E9EBED;
   --surface: #FFFFFF;
-  --ink: #201D17;
-  --ink-soft: #625C4E;
-  --ink-faint: #928A76;
-  --line: #E5E0D2;
-  --line-strong: #D2CAB4;
-  --accent: #E8C76B;
-  --accent-ink: #362B00;
-  --accent-soft: #FBEEB2;
-  --graphite: #6E6A60;
+  --surface-2: #F4F5F6;
+  --ink: #1B1D1F;
+  --ink-soft: #4A4F55;
+  --ink-faint: #5F656C;
+  --line: #E4E7EA;
+  --line-strong: #C9CED3;
+  --accent: #F2D417;
+  --accent-ink: #17191C;
+  --accent-soft: #FBF8E6;
   --success: #1E7A4C;
-  --success-soft: #DCEFE2;
-  --danger: #B23A2E;
-  --danger-soft: #F6DFDA;
-  --shadow: 0 1px 2px rgba(32,29,23,0.04), 0 8px 20px -12px rgba(32,29,23,0.18);
-  --shadow-lg: 0 4px 10px rgba(32,29,23,0.05), 0 20px 40px -20px rgba(32,29,23,0.28);
-  --radius: 10px;
-  /* Banda de marca (header, thead, avisos): negro fijo, no se invierte con el tema. */
-  --band: #0A0908;
-  --band-ink: #F4F2EA;
-  --band-ink-soft: #C9C4B4;
-  color-scheme: light dark;
-}
+  --danger: #A1352A;
+  --danger-soft: #F7E3E0;
+  --danger-line: #E3B8B2;
+  --solido: #17191C;
+  --solido-ink: #FFFFFF;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --paper: #15140F;
-    --surface: #1F1D16;
-    --ink: #F2EEE2;
-    --ink-soft: #C6BFAC;
-    --ink-faint: #948C77;
-    --line: #34301F;
-    --line-strong: #48412A;
-    --accent-ink: #241D00;
-    --accent-soft: #453A12;
-    --graphite: #9C9686;
-    --success: #49C08B;
-    --success-soft: #1D3327;
-    --danger: #E2685A;
-    --danger-soft: #3B2320;
-    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 20px -12px rgba(0,0,0,0.5);
-    --shadow-lg: 0 4px 10px rgba(0,0,0,0.35), 0 24px 44px -20px rgba(0,0,0,0.6);
-  }
-}
+  /* Chrome de la ventana: no se invierte con el tema */
+  --chrome: #17191C;
+  --chrome-ink: #E8EAEC;
+  --chrome-ink-soft: #B9BEC4;
+  --chrome-ink-faint: #9AA0A7;
+  --chrome-line: #3A3E44;
+  --lateral: #23262A;
+  --lateral-activo: #33373C;
+  --lateral-control: #2C3034;
+  --lateral-borde: #41464C;
+  --estado: #D9DCE0;
+  --estado-ink: #3F444A;
 
-/* Selección manual de tema (botón en el header), tiene prioridad sobre el sistema operativo */
-:root[data-theme="light"] {
+  --shadow: 0 1px 2px rgba(23,25,28,0.05);
+  --shadow-lg: 0 8px 24px -8px rgba(23,25,28,0.35);
+  --radius: 8px;
+  --radius-sm: 6px;
+
+  --fs-sm: 12px;
+  --fs-base: 14px;
+  --fs-lg: 18px;
+  --fs-xl: 26px;
+
+  --font-sans: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
   color-scheme: light;
-  --paper: #F6F4EE;
-  --surface: #FFFFFF;
-  --ink: #201D17;
-  --ink-soft: #625C4E;
-  --ink-faint: #928A76;
-  --line: #E5E0D2;
-  --line-strong: #D2CAB4;
-  --accent-ink: #362B00;
-  --accent-soft: #FBEEB2;
-  --graphite: #6E6A60;
-  --success: #1E7A4C;
-  --success-soft: #DCEFE2;
-  --danger: #B23A2E;
-  --danger-soft: #F6DFDA;
-  --shadow: 0 1px 2px rgba(32,29,23,0.04), 0 8px 20px -12px rgba(32,29,23,0.18);
-  --shadow-lg: 0 4px 10px rgba(32,29,23,0.05), 0 20px 40px -20px rgba(32,29,23,0.28);
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --paper: #15140F;
-  --surface: #1F1D16;
-  --ink: #F2EEE2;
-  --ink-soft: #C6BFAC;
-  --ink-faint: #948C77;
-  --line: #34301F;
-  --line-strong: #48412A;
-  --accent-ink: #241D00;
-  --accent-soft: #453A12;
-  --graphite: #9C9686;
+  --paper: #121416;
+  --surface: #1C1F22;
+  --surface-2: #23272B;
+  --ink: #ECEDEE;
+  --ink-soft: #B9BEC4;
+  --ink-faint: #9AA0A7;
+  --line: #2C3035;
+  --line-strong: #41464C;
+  --accent-soft: #2E2B17;
   --success: #49C08B;
-  --success-soft: #1D3327;
   --danger: #E2685A;
   --danger-soft: #3B2320;
-  --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 20px -12px rgba(0,0,0,0.5);
-  --shadow-lg: 0 4px 10px rgba(0,0,0,0.35), 0 24px 44px -20px rgba(0,0,0,0.6);
+  --danger-line: #6B3530;
+  --solido: #ECEDEE;
+  --solido-ink: #17191C;
+  --chrome: #0E1012;
+  --lateral: #17191C;
+  --lateral-activo: #2A2E33;
+  --lateral-control: #202326;
+  --lateral-borde: #353A3F;
+  --estado: #1A1D20;
+  --estado-ink: #9AA0A7;
+  --shadow: 0 1px 2px rgba(0,0,0,0.3);
+  --shadow-lg: 0 8px 24px -8px rgba(0,0,0,0.6);
 }
 
 * { box-sizing: border-box; }
 
-/* Label accesible para screen readers, oculto visualmente (el campo ya se identifica en pantalla con un placeholder u otra pista visual). */
+/* Label accesible para lectores de pantalla, oculto visualmente. */
 .campo-oculto {
   position: absolute;
   width: 1px;
@@ -100,52 +93,28 @@
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-sans);
+  font-size: var(--fs-base);
+  line-height: 1.45;
   background: var(--paper);
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
 }
 
-input, select, button {
-  font-family: inherit;
-  font-size: 1rem;
-}
+h1, h2, h3 { margin: 0; }
 
-input[type="file"]::file-selector-button {
-  background: transparent;
-  color: var(--ink);
-  border: 1px solid var(--line-strong);
-  border-radius: 6px;
-  padding: 0.4rem 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-  margin-right: 0.75rem;
+input, select, button, textarea {
   font-family: inherit;
-}
-
-input[type="file"]::file-selector-button:hover {
-  background: var(--line);
+  font-size: var(--fs-base);
+  color: inherit;
 }
 
 .price-num {
-  font-family: ui-monospace, "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
 
-button {
-  cursor: pointer;
-  border: none;
-  background: var(--accent);
-  color: var(--accent-ink);
-  font-weight: 700;
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
-  transition: filter 0.15s ease, background 0.15s ease, border-color 0.15s ease;
-}
-
-button:hover { filter: brightness(1.05); }
-
-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
 }

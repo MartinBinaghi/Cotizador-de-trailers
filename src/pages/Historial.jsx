@@ -6,6 +6,7 @@ import { generarPdfCotizacion } from '../utils/generarPdf'
 import { formatoARS, NOTA_IVA } from '../utils/formato'
 import { normalizarSeleccionadas, variablesDesdeSeleccion } from '../utils/seleccionVariables'
 import { useToast } from '../components/Toast'
+import { EnShell } from '../components/Shell'
 
 // Fecha local (no UTC) en formato YYYY-MM-DD, para que el filtro coincida
 // con la fecha que se muestra en la lista (toLocaleString).
@@ -114,50 +115,85 @@ export default function Historial({ onDuplicar }) {
   }
 
   return (
-    <div className="page">
-      <h2 className="titulo-pagina">Historial de cotizaciones</h2>
-
-      <div className="form-card">
-        <div className="form-inline">
-          <input
-            placeholder="Buscar por cliente..."
-            value={busqueda}
-            onChange={e => setBusqueda(e.target.value)}
-          />
-          <label className="filtro-fecha">
-            Desde
-            <input type="date" value={desde} onChange={e => setDesde(e.target.value)} />
-          </label>
-          <label className="filtro-fecha">
-            Hasta
-            <input type="date" value={hasta} onChange={e => setHasta(e.target.value)} />
-          </label>
+    <div className="pagina">
+      <div className="barra-pagina">
+        <div className="barra-pagina-titulo">
+          <h1>Historial de cotizaciones</h1>
+          <span className="meta">{cotizaciones.length} guardada{cotizaciones.length === 1 ? '' : 's'}</span>
         </div>
       </div>
 
-      {cotizacionesFiltradas.length === 0 && (
-        <div className="panel-vacio">
-          {cotizaciones.length === 0
-            ? 'Todavía no hay cotizaciones guardadas. Creá la primera desde la pestaña Cotizador.'
-            : 'No hay cotizaciones que coincidan con la búsqueda.'}
-        </div>
-      )}
+      <div className="pagina-cuerpo">
+        <section className="panel">
+          <div className="panel-cabecera">
+            <h2 className="panel-titulo">Cotizaciones</h2>
+            <div className="grupo-filtros">
+              <label className="campo-oculto" htmlFor="buscar-historial">Buscar por cliente</label>
+              <input
+                id="buscar-historial"
+                type="search"
+                className="input-busqueda"
+                placeholder="Buscar por cliente, razón social o CUIT"
+                value={busqueda}
+                onChange={e => setBusqueda(e.target.value)}
+              />
+              <label className="selector-compacto">
+                Desde
+                <input type="date" value={desde} onChange={e => setDesde(e.target.value)} />
+              </label>
+              <label className="selector-compacto">
+                Hasta
+                <input type="date" value={hasta} onChange={e => setHasta(e.target.value)} />
+              </label>
+            </div>
+          </div>
 
-      <ul className="lista-admin">
-        {cotizacionesFiltradas.map(c => (
-          <li className="fila-historial" key={c.id}>
-            <span className="historial-fecha">{new Date(c.fecha).toLocaleString('es-AR')}</span>
-            <span className="historial-cliente">{textoCliente(c)}</span>
-            <span className="historial-tipo">{c.snapshot?.tipoTrailerNombre ?? nombreTipo(c.tipoTrailerId)}</span>
-            <strong className="price-num">{formatoARS.format(c.precioFinal)} <span className="nota-iva">{NOTA_IVA}</span></strong>
-            <span className="acciones">
-              <button className="btn-secundario" onClick={() => duplicar(c)}>Duplicar</button>
-              <button className="btn-secundario" onClick={() => descargarPdf(c)}>PDF</button>
-              <button className="btn-peligro" onClick={() => eliminar(c.id)}>Eliminar</button>
-            </span>
-          </li>
-        ))}
-      </ul>
+          {cotizacionesFiltradas.length === 0 ? (
+            <p className="panel-vacio">
+              {cotizaciones.length === 0
+                ? 'Todavía no hay cotizaciones guardadas. Creá la primera desde Cotizador.'
+                : 'No hay cotizaciones que coincidan con la búsqueda.'}
+            </p>
+          ) : (
+            <div className="tabla-scroll">
+              <table className="tabla tabla-catalogo">
+                <thead>
+                  <tr>
+                    <th scope="col">Fecha</th>
+                    <th scope="col">Cliente</th>
+                    <th scope="col">Producto</th>
+                    <th scope="col" className="col-num">Total</th>
+                    <th scope="col" className="col-acciones"><span className="campo-oculto">Acciones</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cotizacionesFiltradas.map(c => (
+                    <tr key={c.id}>
+                      <td className="texto-suave price-num">{new Date(c.fecha).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })}</td>
+                      <td>{textoCliente(c)}</td>
+                      <td>{c.snapshot?.tipoTrailerNombre ?? nombreTipo(c.tipoTrailerId)}</td>
+                      <td className="col-num price-num">
+                        {formatoARS.format(c.precioFinal)} <span className="nota-iva">{NOTA_IVA}</span>
+                      </td>
+                      <td className="col-acciones">
+                        <div className="grupo-botones">
+                          <button type="button" className="btn-secundario btn-chico" onClick={() => duplicar(c)}>Duplicar</button>
+                          <button type="button" className="btn-secundario btn-chico" onClick={() => descargarPdf(c)}>PDF</button>
+                          <button type="button" className="btn-peligro btn-chico" onClick={() => eliminar(c.id)}>Eliminar</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      </div>
+
+      <EnShell zona="estado">
+        <span>{cotizacionesFiltradas.length} de {cotizaciones.length} cotizaciones</span>
+      </EnShell>
     </div>
   )
 }

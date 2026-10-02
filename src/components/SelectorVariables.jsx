@@ -6,10 +6,11 @@ import { db } from '../db/database'
 import { compararPor } from '../utils/ordenar'
 
 /**
- * Lista de variables agrupadas por categoría (A-Z), con buscador; dentro de
+ * Tabla de variables agrupadas por categoría (A-Z), con buscador; dentro de
  * cada categoría se ordenan según `orden` (ver utils/ordenar).
  * Las variables con `permiteCantidad` muestran un input numérico cuando están
  * seleccionadas (ej: cantidad de frenos, llantas, cubiertas, etc.).
+ * `children` se dibuja en la fila de filtros, junto al buscador (ej: el tipo de producto).
  *
  * @param {object} props
  * @param {Array} props.variables catálogo completo de variables
@@ -17,7 +18,7 @@ import { compararPor } from '../utils/ordenar'
  * @param {(id: number) => void} props.onToggle
  * @param {(id: number, cantidad: string|number) => void} props.onCantidadChange
  */
-export default function SelectorVariables({ variables, clases = [], seleccionadas, onToggle, onCantidadChange, orden }) {
+export default function SelectorVariables({ variables, clases = [], seleccionadas, onToggle, onCantidadChange, orden, children }) {
   const [busqueda, setBusqueda] = useState('')
   const busquedaId = useId()
   const registrosCategorias = useLiveQuery(() => db.categorias.toArray(), []) ?? []
@@ -41,63 +42,89 @@ export default function SelectorVariables({ variables, clases = [], seleccionada
 
   return (
     <div className="selector-variables">
-      <label className="campo-oculto" htmlFor={busquedaId}>Buscar variable</label>
-      <input
-        id={busquedaId}
-        className="buscador-variables"
-        placeholder="Buscar variable..."
-        value={busqueda}
-        onChange={e => setBusqueda(e.target.value)}
-      />
+      <div className="fila-filtros">
+        {children}
+        <label className="campo" htmlFor={busquedaId}>
+          Buscar variable
+          <input
+            id={busquedaId}
+            type="search"
+            placeholder="Nombre o categoría"
+            value={busqueda}
+            onChange={e => setBusqueda(e.target.value)}
+          />
+        </label>
+      </div>
 
       {busqueda && categorias.length === 0 && (
         <p className="texto-ayuda">Sin resultados para "{busqueda}".</p>
       )}
+      {!busqueda && variables.length === 0 && (
+        <p className="texto-ayuda">No hay variables cargadas en esta clase.</p>
+      )}
 
-      <div className="grupos-variables">
-      {categorias.map(cat => (
-        <fieldset key={cat.id} className="grupo-variables">
-          <legend>{cat.nombre}{' '}
-            <span className="etiqueta-clase">
-              {nombreClase(clases, claseDe(registrosCategorias.find(c => c.id === cat.id) ?? {}))}
-            </span>
-          </legend>
-          {variablesFiltradas.filter(v => (v.categoriaId ?? v.categoria) === cat.id).map(v => {
-            const estaSeleccionada = Object.prototype.hasOwnProperty.call(seleccionadas, v.id)
-            const cantidad = seleccionadas[v.id] ?? 1
-            return (
-              <div key={v.id} className="checkbox-variable">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={estaSeleccionada}
-                    onChange={() => onToggle(v.id)}
-                  />
-                  {v.nombre}{' '}
-                  <span className="etiqueta-clase">{nombreClase(clases, claseDe(v))}</span>{' '}
-                  <span className="modificador">
-                    {v.tipoModificador === 'fijo'
-                      ? `(${formatoARS.format(v.valor)})`
-                      : `${v.valor >= 0 ? '+' : ''}${v.valor}%`}
-                  </span>
-                </label>
-                {estaSeleccionada && v.permiteCantidad && v.tipoModificador === 'fijo' && (
-                  <input
-                    type="number"
-                    min="1"
-                    max="999"
-                    className="input-cantidad"
-                    value={cantidad}
-                    onChange={e => onCantidadChange(v.id, e.target.value)}
-                    aria-label={`Cantidad de ${v.nombre}`}
-                  />
-                )}
-              </div>
-            )
-          })}
-        </fieldset>
-      ))}
-      </div>
+      {categorias.length > 0 && (
+        <div className="tabla-scroll">
+          <table className="tabla tabla-variables">
+            <thead>
+              <tr>
+                <th scope="col">Variable</th>
+                <th scope="col" className="col-num col-cantidad">Cant.</th>
+                <th scope="col" className="col-num">Importe</th>
+              </tr>
+            </thead>
+            {categorias.map(cat => (
+              <tbody key={cat.id}>
+                <tr className="fila-grupo">
+                  <th scope="colgroup" colSpan={3}>
+                    {cat.nombre}{' '}
+                    <span className="etiqueta-clase">
+                      {nombreClase(clases, claseDe(registrosCategorias.find(c => c.id === cat.id) ?? {}))}
+                    </span>
+                  </th>
+                </tr>
+                {variablesFiltradas.filter(v => (v.categoriaId ?? v.categoria) === cat.id).map(v => {
+                  const estaSeleccionada = Object.prototype.hasOwnProperty.call(seleccionadas, v.id)
+                  const conCantidad = estaSeleccionada && v.permiteCantidad && v.tipoModificador === 'fijo'
+                  return (
+                    <tr key={v.id} className={estaSeleccionada ? 'seleccionada' : undefined}>
+                      <td>
+                        <label className="celda-check">
+                          <input
+                            type="checkbox"
+                            checked={estaSeleccionada}
+                            onChange={() => onToggle(v.id)}
+                          />
+                          <span>{v.nombre}</span>{' '}
+                          <span className="etiqueta-clase">{nombreClase(clases, claseDe(v))}</span>
+                        </label>
+                      </td>
+                      <td className="col-num col-cantidad">
+                        {conCantidad ? (
+                          <input
+                            type="number"
+                            min="1"
+                            max="999"
+                            className="input-cantidad"
+                            value={seleccionadas[v.id] ?? 1}
+                            onChange={e => onCantidadChange(v.id, e.target.value)}
+                            aria-label={`Cantidad de ${v.nombre}`}
+                          />
+                        ) : <span className="texto-tenue">—</span>}
+                      </td>
+                      <td className="col-num price-num">
+                        {v.tipoModificador === 'fijo'
+                          ? formatoARS.format(v.valor)
+                          : `${v.valor >= 0 ? '+' : '−'}${Math.abs(v.valor)} %`}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            ))}
+          </table>
+        </div>
+      )}
     </div>
   )
 }

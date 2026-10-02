@@ -12,6 +12,7 @@ import { ordenar } from '../utils/ordenar'
 import CampoObservaciones from '../components/CampoObservaciones'
 import { CLASE_TRAILERS, perteneceAClase, claseDe, nombreClase, seleccionVisible } from '../utils/clasesProductos'
 import { useToast } from '../components/Toast'
+import { EnShell } from '../components/Shell'
 
 const MAX_IMAGENES = 3
 
@@ -38,6 +39,7 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales, cl
   const [cargandoImagenes, setCargandoImagenes] = useState(false)
   const [versionFormulario, setVersionFormulario] = useState(0)
   const [borradorListo, setBorradorListo] = useState(false)
+  const [ultimoGuardado, setUltimoGuardado] = useState(null)
   const [orden, setOrden] = useState('nombre-asc')
 
   useEffect(() => {
@@ -73,6 +75,7 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales, cl
   useEffect(() => {
     if (!borradorListo) return
     guardarBorrador('cotizador', 'borradorCotizador', claseId, { tipoTrailerId, seleccionadas, nombreCliente, razonSocial, cuit, imagenes, observaciones })
+      .then(() => setUltimoGuardado(new Date()))
       .catch(() => showToast('No se pudo guardar el borrador. Intentá nuevamente.', 'error'))
   }, [claseId, borradorListo, tipoTrailerId, seleccionadas, nombreCliente, razonSocial, cuit, imagenes, observaciones])
 
@@ -213,162 +216,180 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales, cl
     })
   }
 
+  const horaGuardado = ultimoGuardado?.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+  const cantidadSeleccionadas = variablesSeleccionadas.length
+
   return (
-    <div className="page">
-      <div className="cotizador-encabezado">
-        <h2 className="titulo-pagina">Nueva cotización</h2>
-        <button
-          type="button"
-          className="btn-secundario"
-          onClick={limpiarBorrador}
-          disabled={!borradorListo || guardando || cargandoImagenes}
-        >
-          Limpiar borrador
-        </button>
-      </div>
-
-      <div className="cotizador-layout">
-      <div className="form-card">
-        <div className="grupo-campo">
-          <span className="grupo-titulo">Datos del cliente</span>
-          <div className="fila-campos">
-            <label className="campo">
-              Nombre del cliente (opcional)
-              <input value={nombreCliente} onChange={e => setNombreCliente(e.target.value)} placeholder="Nombre del cliente" />
-            </label>
-
-            <label className="campo">
-              Razón social (opcional)
-              <input value={razonSocial} onChange={e => setRazonSocial(e.target.value)} placeholder="Razón social" />
-            </label>
-
-            <label className="campo">
-              CUIT (opcional)
-              <input value={cuit} onChange={e => setCuit(e.target.value)} placeholder="CUIT" />
-            </label>
-          </div>
+    <div className="pagina">
+      <div className="barra-pagina">
+        <div className="barra-pagina-titulo">
+          <h1>Nueva cotización</h1>
+          {tipoTrailer && <span className="meta">{tipoTrailer.nombre}</span>}
         </div>
-
-        <hr className="divider" />
-
-        <div className="grupo-campo">
-          <span className="grupo-titulo">Configuración</span>
-          <SelectorOrden value={orden} onChange={setOrden} />
-          <label className="campo">
-            Tipo de producto
-            <select value={tipoTrailerId} onChange={e => setTipoTrailerId(e.target.value)}>
-              <option value="">Seleccionar...</option>
-              {ordenar(tipos, orden).map(t => (
-                <option key={t.id} value={t.id}>{t.nombre} ({nombreClase(clases, claseDe(t))}) — {formatoARS.format(t.precioBase)}</option>
-              ))}
-            </select>
-          </label>
-
-          <SelectorVariables
-            key={versionFormulario}
-            variables={variables}
-            clases={clases}
-            orden={orden}
-            seleccionadas={seleccionadas}
-            onToggle={toggleVariable}
-            onCantidadChange={cambiarCantidad}
-          />
-
-          <div className="campo">
-            <label>Imágenes (opcional, hasta {MAX_IMAGENES})</label>
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={agregarImagenes}
-              disabled={cargandoImagenes || imagenes.length >= MAX_IMAGENES}
-            />
-            {imagenes.length > 0 && (
-              <div className="miniaturas-imagenes">
-                {imagenes.map((src, i) => (
-                  <div className="miniatura-imagen" key={i}>
-                    <img src={src} alt={`Imagen ${i + 1}`} />
-                    <button
-                      type="button"
-                      className="btn-quitar-imagen"
-                      onClick={() => quitarImagen(i)}
-                      aria-label={`Quitar imagen ${i + 1}`}
-                      title="Quitar imagen"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <CampoObservaciones value={observaciones} onChange={setObservaciones} />
+        <div className="barra-pagina-acciones">
+          <button
+            type="button"
+            className="btn-secundario"
+            onClick={limpiarBorrador}
+            disabled={!borradorListo || guardando || cargandoImagenes}
+          >
+            Limpiar
+          </button>
+          <button type="button" className="btn-secundario" onClick={descargarPdf}>Descargar PDF</button>
+          <button type="button" className="btn-primario" onClick={guardarCotizacion} disabled={guardando}>
+            {guardando ? 'Guardando...' : 'Guardar cotización'}
+          </button>
         </div>
       </div>
 
-      <aside className="panel-lateral">
-      {resultado && costo && (
-        <div className="resumen-ganancia">
-          <p className="texto-ayuda">Solo visible para vos — no aparece en el PDF</p>
-          <div className="linea-precio">
-            <span>Costo total</span>
-            <span className="price-num">{formatoARS.format(costo.precioFinal)}</span>
-          </div>
-          <div className="linea-precio">
-            <span>Valor total</span>
-            <span className="price-num">{formatoARS.format(resultado.precioFinal)}</span>
-          </div>
-          <div className="linea-precio">
-            <span>Margen de ganancia</span>
-            <span className="price-num">{formatoARS.format(margenGanancia)} ({margenGananciaPct.toFixed(1)}%)</span>
-          </div>
-        </div>
-      )}
-
-      {resultado && (
-        <div className="resultado">
-          <div className="resultado-header-config">
-            <label className="selector-redondeo">
-              Redondeo
-              <select value={redondeo} onChange={e => cambiarRedondeo(e.target.value)}>
-                <option value={1}>Sin redondeo</option>
-                <option value={100}>$100</option>
-                <option value={1000}>$1.000</option>
-                <option value={10000}>$10.000</option>
-              </select>
-            </label>
-          </div>
-          <div className="linea-precio">
-            <span>Precio estándar</span>
-            <span className="price-num">{formatoARS.format(precioEstandar)}</span>
-          </div>
-          {totalOpcionales !== 0 && (
-            <div className="linea-precio">
-              <span>Adicionales opcionales</span>
-              <span className="price-num">{formatoARS.format(totalOpcionales)}</span>
+      <div className="pagina-cuerpo layout-con-resumen">
+        <div className="columna-principal">
+          <section className="panel">
+            <h2 className="panel-titulo">Cliente</h2>
+            <div className="panel-cuerpo fila-campos">
+              <label className="campo">
+                Nombre del cliente
+                <input value={nombreCliente} onChange={e => setNombreCliente(e.target.value)} placeholder="Opcional" />
+              </label>
+              <label className="campo">
+                Razón social
+                <input value={razonSocial} onChange={e => setRazonSocial(e.target.value)} placeholder="Opcional" />
+              </label>
+              <label className="campo">
+                CUIT
+                <input value={cuit} onChange={e => setCuit(e.target.value)} placeholder="Opcional" />
+              </label>
             </div>
-          )}
-          <div className="total-row">
-            <span className="etiqueta">Total</span>
-            <span>
-              <span className="valor price-num">{formatoARS.format(resultado.precioFinal)}</span>
-              <span className="nota-iva">{NOTA_IVA}</span>
-            </span>
-          </div>
-          <div className="acciones-resultado">
-            <button onClick={guardarCotizacion} disabled={guardando}>
-              {guardando ? 'Guardando...' : 'Guardar cotización'}
-            </button>
-            <button className="btn-secundario" onClick={descargarPdf}>Descargar PDF</button>
-          </div>
+          </section>
+
+          <section className="panel">
+            <div className="panel-cabecera">
+              <h2 className="panel-titulo">Configuración</h2>
+              <SelectorOrden value={orden} onChange={setOrden} />
+            </div>
+            <SelectorVariables
+              key={versionFormulario}
+              variables={variables}
+              clases={clases}
+              orden={orden}
+              seleccionadas={seleccionadas}
+              onToggle={toggleVariable}
+              onCantidadChange={cambiarCantidad}
+            >
+              <label className="campo campo-ancho">
+                Tipo de producto
+                <select value={tipoTrailerId} onChange={e => setTipoTrailerId(e.target.value)}>
+                  <option value="">Seleccionar...</option>
+                  {ordenar(tipos, orden).map(t => (
+                    <option key={t.id} value={t.id}>{t.nombre} ({nombreClase(clases, claseDe(t))}) — {formatoARS.format(t.precioBase)}</option>
+                  ))}
+                </select>
+              </label>
+            </SelectorVariables>
+          </section>
+
+          <section className="panel">
+            <h2 className="panel-titulo">Imágenes y observaciones</h2>
+            <div className="panel-cuerpo pila">
+              <div className="campo">
+                <span>Imágenes (opcional, hasta {MAX_IMAGENES})</span>
+                <div className="fila-imagenes">
+                  {imagenes.map((src, i) => (
+                    <div className="miniatura-imagen" key={i}>
+                      <img src={src} alt={`Imagen ${i + 1}`} />
+                      <button
+                        type="button"
+                        className="btn-quitar-imagen"
+                        onClick={() => quitarImagen(i)}
+                        aria-label={`Quitar imagen ${i + 1}`}
+                        title="Quitar imagen"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  {imagenes.length < MAX_IMAGENES && (
+                    <label className="btn-archivo">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="campo-oculto"
+                        onChange={agregarImagenes}
+                        disabled={cargandoImagenes}
+                      />
+                      {cargandoImagenes ? 'Cargando…' : '+ Agregar imagen'}
+                    </label>
+                  )}
+                </div>
+              </div>
+              <CampoObservaciones value={observaciones} onChange={setObservaciones} />
+            </div>
+          </section>
         </div>
-      )}
-      {!resultado && (
-        <div className="panel-vacio">Elegí un tipo de producto para ver el precio.</div>
-      )}
-      </aside>
+
+        <aside className="columna-resumen" aria-label="Resumen de la cotización">
+          <section className="panel resumen">
+            <div className="resumen-cabecera">
+              <span className="eyebrow">Resumen</span>
+              <span className="resumen-producto">{tipoTrailer?.nombre ?? 'Sin producto'}</span>
+            </div>
+            {resultado ? (
+              <>
+                <div className="resumen-lineas">
+                  <div className="linea-precio"><span>Precio base</span><span className="price-num">{formatoARS.format(resultado.base)}</span></div>
+                  {resultado.detalle.map(d => (
+                    <div className="linea-precio" key={d.id}>
+                      <span>{d.nombre}{seleccionadas[d.id] > 1 ? ` ×${seleccionadas[d.id]}` : ''}{d.esOpcional ? ' (opcional)' : ''}</span>
+                      <span className="price-num">{formatoARS.format(d.monto)}</span>
+                    </div>
+                  ))}
+                  <hr className="divider" />
+                  <div className="linea-precio"><span>Precio estándar</span><span className="price-num">{formatoARS.format(precioEstandar)}</span></div>
+                  <div className="linea-precio"><span>Adicionales opcionales</span><span className="price-num">{formatoARS.format(totalOpcionales)}</span></div>
+                </div>
+                <div className="resumen-total">
+                  <div className="resumen-total-etiqueta">
+                    <span className="eyebrow">Total</span>
+                    <span className="nota-iva">{NOTA_IVA}</span>
+                  </div>
+                  <span className="valor price-num">{formatoARS.format(resultado.precioFinal)}</span>
+                </div>
+              </>
+            ) : (
+              <p className="resumen-vacio">Elegí un tipo de producto para ver el precio.</p>
+            )}
+            <div className="resumen-pie">
+              <label className="selector-compacto">
+                Redondeo
+                <select value={redondeo} onChange={e => cambiarRedondeo(e.target.value)}>
+                  <option value={1}>Sin redondeo</option>
+                  <option value={100}>$100</option>
+                  <option value={1000}>$1.000</option>
+                  <option value={10000}>$10.000</option>
+                </select>
+              </label>
+            </div>
+          </section>
+
+          {resultado && costo && (
+            <section className="panel panel-interno" aria-label="Datos internos">
+              <div className="panel-interno-cabecera">
+                <span className="eyebrow">Interno</span>
+                <span className="texto-tenue">No aparece en el PDF</span>
+              </div>
+              <div className="linea-precio"><span>Costo total</span><span className="price-num">{formatoARS.format(costo.precioFinal)}</span></div>
+              <div className="linea-precio"><span>Margen de ganancia</span><span className="price-num">{formatoARS.format(margenGanancia)} · {margenGananciaPct.toFixed(1)}%</span></div>
+            </section>
+          )}
+        </aside>
       </div>
+
+      <EnShell zona="estado">
+        <span>{horaGuardado ? `Borrador guardado ${horaGuardado}` : 'Borrador sin cambios'}</span>
+        <span>{cantidadSeleccionadas} variable{cantidadSeleccionadas === 1 ? '' : 's'} seleccionada{cantidadSeleccionadas === 1 ? '' : 's'}</span>
+        <span>Clase: {nombreClase(clases, claseId)}</span>
+      </EnShell>
     </div>
   )
 }

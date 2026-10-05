@@ -112,7 +112,9 @@ export async function combinarBackup(analisis, sobrescribirDuplicados) {
   const resumen = { agregados: 0, sobrescritos: 0, mantenidos: 0 }
   const mapaTipos = new Map(), mapaCategorias = new Map(), mapaVariables = new Map()
   function sinId(item) {
-    const { id, claveImportacion, ...resto } = item
+    // uid/actualizado identifican el registro en la carpeta compartida: lo
+    // importado es un dato nuevo para esta base y recibe su propia identidad.
+    const { id, claveImportacion, uid, actualizado, ...resto } = item
     return resto
   }
   async function combinar(tabla, grupo, mapa, preparar = sinId) {

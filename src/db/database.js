@@ -1,5 +1,6 @@
 import Dexie from 'dexie'
 import { CLASE_TRAILERS, CLASES_INICIALES, normalizarNombre } from '../utils/clasesProductos.js'
+import { registrarHooks } from './sincronizacion.js'
 
 // Toda la data vive en el navegador (IndexedDB). No hay backend ni nube.
 export const db = new Dexie('CotizadorTrailersDB')
@@ -116,6 +117,27 @@ db.version(6).stores({
   }
   await tx.table('cotizaciones').toCollection().modify({ claseId: CLASE_TRAILERS })
 })
+
+// v7: identidad común entre equipos para la carpeta compartida (ver sincronizacion.js).
+// `uid` identifica un registro en todos los equipos y `actualizado` decide qué
+// cambio gana. Lo existente queda en 0: al conectar, el usuario elige si gana la
+// carpeta o esta computadora. `eliminados` guarda los borrados para propagarlos.
+db.version(7).stores({
+  tiposTrailer: '++id, nombre, precioBase, claseId, uid',
+  categorias: '++id, nombre, claseId, &[claseId+nombre], uid',
+  variables: '++id, categoria, categoriaId, nombre, tipoModificador, valor, aplicaSobre, claseId, uid',
+  cotizaciones: '++id, tipoTrailerId, fecha, precioFinal, uid',
+  eliminados: 'clave'
+}).upgrade(async tx => {
+  for (const tabla of ['tiposTrailer', 'categorias', 'variables', 'cotizaciones']) {
+    await tx.table(tabla).toCollection().modify(registro => {
+      registro.uid = crypto.randomUUID()
+      registro.actualizado = 0
+    })
+  }
+})
+
+registrarHooks(db)
 
 db.on('populate', tx => tx.table('clasesProductos').bulkAdd(CLASES_INICIALES))
 

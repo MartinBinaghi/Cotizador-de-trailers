@@ -13,6 +13,7 @@ import AdminCategorias from '../components/AdminCategorias'
 import Inspector from '../components/Inspector'
 import SelectorOrden from '../components/SelectorOrden'
 import { EnShell } from '../components/Shell'
+import { CarpetaCompartida } from '../components/Sincronizacion'
 import { ordenar, compararPor } from '../utils/ordenar'
 import { useToast } from '../components/Toast'
 
@@ -48,6 +49,7 @@ export default function Admin({ claseId, clases }) {
             <span className="meta">Clase: {nombreClase(clases, claseId)}</span>
           </div>
           <div className="barra-pagina-acciones">
+            <CarpetaCompartida />
             <ExportarCatalogo />
             <BackupRestore />
             {actual.nuevo && (

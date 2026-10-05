@@ -9,6 +9,7 @@ import Admin from './pages/Admin'
 import Historial from './pages/Historial'
 import Comparativa from './pages/Comparativa'
 import { ShellContext } from './components/Shell'
+import { SincronizacionProvider, IndicadorSincronizacion } from './components/Sincronizacion'
 import { version } from '../package.json'
 import './App.css'
 
@@ -62,6 +63,7 @@ export default function App() {
 
   return (
     <ToastProvider>
+      <SincronizacionProvider>
       <ShellContext.Provider value={zonas}>
       <div className="app">
         <header className="barra-titulo">
@@ -71,7 +73,7 @@ export default function App() {
             <span className="marca-producto">Cotizador de productos</span>
           </div>
           <div className="barra-titulo-derecha">
-            <span className="indicador-local"><span className="indicador-punto" />Base de datos local</span>
+            <IndicadorSincronizacion />
             <button
               type="button"
               className="btn-tema"
@@ -131,6 +133,7 @@ export default function App() {
         </footer>
       </div>
       </ShellContext.Provider>
+      </SincronizacionProvider>
     </ToastProvider>
   )
 }

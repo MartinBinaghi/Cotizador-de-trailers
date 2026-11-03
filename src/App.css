@@ -3,6 +3,8 @@
   height: 100vh;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
+  /* Ventana de escritorio: solo se desplaza el contenido, nunca la ventana entera. */
+  overflow: hidden;
 }
 
 .barra-titulo {
@@ -132,6 +134,9 @@
   flex: 1;
   min-width: 0;
   overflow: auto;
+  /* Referencia de los elementos posicionados (ej: inputs ocultos con .campo-oculto):
+     así quedan dentro de este scroll y no estiran la ventana entera. */
+  position: relative;
 }
 
 .barra-estado {
@@ -150,7 +155,7 @@
 .barra-estado-version { margin-left: auto; }
 
 @media (max-width: 760px) {
-  .app { height: auto; min-height: 100vh; }
+  .app { height: auto; min-height: 100vh; overflow: visible; }
   .app-cuerpo { flex-direction: column; }
   .barra-lateral { flex: none; gap: 12px; overflow: visible; }
   .barra-lateral-items { flex-direction: row; flex-wrap: wrap; }

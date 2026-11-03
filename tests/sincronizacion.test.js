@@ -169,6 +169,23 @@ test('la carpeta: escribe el archivo propio y solo vuelve a leer los que cambiar
   assert.equal(lecturas, 2)
 })
 
+test('con un catálogo grande sin cambios la transacción no se cierra antes de tiempo', async () => {
+  // Regresión: con ~100 registros iguales seguidos fallaba con "Transaction committed too early".
+  const categorias = []
+  for (let i = 0; i < 19; i++) categorias.push(await db.categorias.add({ nombre: `Cat ${i}`, claseId: 'trailers', esDescuento: false }))
+  for (let i = 0; i < 47; i++) await db.tiposTrailer.add({ nombre: `Tipo ${i}`, claseId: 'trailers', precioBase: 1000 + i })
+  for (let i = 0; i < 104; i++) {
+    await db.variables.add({ nombre: `Var ${i}`, categoria: `Cat ${i % 19}`, categoriaId: categorias[i % 19],
+      claseId: 'trailers', valor: i, tipoModificador: 'fijo', aplicaSobre: 'base' })
+  }
+  const remoto = await estadoRemoto()
+  const ultima = remoto.variables.at(-1)
+  ultima.valor = 999
+  ultima.actualizado = Date.now() + 1000
+  assert.equal(await aplicarEstado(db, remoto), 1)
+  assert.equal(await aplicarEstado(db, remoto), 0)
+})
+
 test('rechaza el archivo de una versión más nueva del cotizador', async () => {
   const io = {
     listar: async () => [{ nombre: 'cotizador-sync-otro.json', modificado: 1 }],

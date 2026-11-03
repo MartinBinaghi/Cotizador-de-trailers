@@ -148,7 +148,9 @@ export async function aplicarEstado(db, estado) {
       const porClave = new Map(locales.map(r => [claveNatural(r), r]))
       for (const remoto of entrantes) {
         if (!remoto.uid || borradoDespues(nombre, remoto)) continue
-        const datos = await traducir(remoto)
+        // Sin await: esperar algo que no es una operación de la base deja la
+        // transacción sin pedidos y se cierra sola ("Transaction committed too early").
+        const datos = traducir(remoto)
         if (!datos) continue // referencia todavía no disponible: se reintenta en la próxima pasada
         let local = porUid.get(remoto.uid) ?? porClave.get(claveNatural(datos))
         try {

@@ -1,3 +1,6 @@
+/** Fecha y hora cortas (ej: 27/11/26, 11:47). */
+export const fechaHora = fecha => new Date(fecha).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })
+
 export const formatoARS = new Intl.NumberFormat('es-AR', {
   style: 'currency',
   currency: 'ARS',

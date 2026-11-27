@@ -60,6 +60,7 @@
 }
 
 .btn-tema:hover { background: var(--lateral-activo); color: var(--chrome-ink); }
+.btn-tema:disabled { background: transparent; }
 
 .app-cuerpo {
   display: flex;
@@ -759,6 +760,12 @@ input[type="checkbox"] { cursor: pointer; }
 .datos-sincronizacion { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 0; font-size: var(--fs-sm); }
 .datos-sincronizacion dt { color: var(--ink-faint); }
 .datos-sincronizacion dd { margin: 0; }
+
+.grupo-historial { display: flex; gap: 4px; }
+.dialogo-ancho { width: min(44rem, calc(100% - 2rem)); }
+.lista-historial { max-height: 55vh; overflow-y: auto; border-bottom: 1px solid var(--line); }
+.lista-historial li { padding: 6px 4px; font-size: var(--fs-sm); }
+.paso-deshecho { opacity: 0.55; }
 
 .dialogo-acciones { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
 

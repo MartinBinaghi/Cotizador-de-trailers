@@ -11,6 +11,8 @@ import Historial from './pages/Historial'
 import Comparativa from './pages/Comparativa'
 import { ShellContext } from './components/Shell'
 import { SincronizacionProvider, IndicadorSincronizacion } from './components/Sincronizacion'
+import HistorialCambios from './components/HistorialCambios'
+import Icono from './components/Icono'
 import { version } from '../package.json'
 import './App.css'
 
@@ -75,6 +77,7 @@ export default function App() {
           </div>
           <div className="barra-titulo-derecha">
             <IndicadorSincronizacion />
+            <HistorialCambios />
             <button
               type="button"
               className="btn-tema"
@@ -172,14 +175,5 @@ function BotonActualizar() {
     <button type="button" className="btn-fila btn-actualizar" onClick={actualizar} disabled={estado != null}>
       {estado ?? 'Buscar actualización'}
     </button>
-  )
-}
-
-function Icono({ d }) {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d={d} />
-    </svg>
   )
 }

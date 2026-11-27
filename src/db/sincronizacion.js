@@ -24,7 +24,9 @@ export const FORMATO_SYNC = 1
 export const cambiosLocales = new EventTarget()
 
 const uidDe = (tabla, registro) => (tabla === 'clasesProductos' ? registro.id : registro.uid)
-const esInterna = trans => trans.mode === 'versionchange' || trans.sincronizando
+// Las migraciones y el populate corren en la transacción `versionchange` de IndexedDB
+// (Dexie la expone como 'readwrite': el modo real está en idbtrans).
+export const esInterna = trans => trans.idbtrans?.mode === 'versionchange' || trans.sincronizando
 
 /** Sella uid/fecha en cada alta o edición y registra cada borrado, venga de la pantalla que venga. */
 export function registrarHooks(db) {

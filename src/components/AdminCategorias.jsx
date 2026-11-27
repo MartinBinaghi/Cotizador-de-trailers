@@ -46,7 +46,7 @@ export default function AdminCategorias({ categorias, claseId, clases, orden, se
         )}
       </section>
       <FormCategoria
-        key={actual?.id ?? `nuevo-${nuevo}`}
+        key={actual ? `${actual.id}-${actual.actualizado}` : `nuevo-${nuevo}`}
         categoria={actual}
         claseId={claseId}
         clases={clases}

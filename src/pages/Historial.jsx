@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/database'
 import { calcularPrecioConGanancia } from '../utils/calcularPrecio'
 import { generarPdfCotizacion, errorPdf } from '../utils/generarPdf'
-import { formatoARS, NOTA_IVA } from '../utils/formato'
+import { formatoARS, NOTA_IVA, fechaHora } from '../utils/formato'
 import { normalizarSeleccionadas, variablesDesdeSeleccion } from '../utils/seleccionVariables'
 import { useToast } from '../components/Toast'
 import { EnShell } from '../components/Shell'
@@ -177,7 +177,7 @@ export default function Historial({ onDuplicar }) {
                 <tbody>
                   {cotizacionesFiltradas.map(c => (
                     <tr key={c.id}>
-                      <td className="texto-suave price-num">{new Date(c.fecha).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })}</td>
+                      <td className="texto-suave price-num">{fechaHora(c.fecha)}</td>
                       <td>{textoCliente(c)}</td>
                       <td>{c.snapshot?.tipoTrailerNombre ?? nombreTipo(c.tipoTrailerId)}</td>
                       <td className="col-num price-num">

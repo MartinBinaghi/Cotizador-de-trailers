@@ -3,6 +3,7 @@ import { isTauri } from '@tauri-apps/api/core'
 import { db } from '../db/database'
 import { sincronizarCarpeta, cambiosLocales, priorizarDatosLocales, PREFIJO_ARCHIVO } from '../db/sincronizacion'
 import { useToast } from './Toast'
+import { fechaHora } from '../utils/formato'
 
 const INTERVALO_MS = 30_000
 const ESPERA_TRAS_CAMBIO_MS = 2_000
@@ -221,7 +222,7 @@ export function CarpetaCompartida() {
               <dt>Otros equipos</dt>
               <dd>
                 {otrosEquipos.length === 0 ? 'Ninguno todavía'
-                  : otrosEquipos.map(e => `actualizado ${new Date(e.modificado).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })}`).join(' · ')}
+                  : otrosEquipos.map(e => `actualizado ${fechaHora(e.modificado)}`).join(' · ')}
               </dd>
             </dl>
             <div className="dialogo-acciones">

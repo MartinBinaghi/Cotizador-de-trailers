@@ -314,7 +314,7 @@ test('el historial conserva la cotización de la clase borrada', async ({ page }
   await expect(selector(page)).toHaveValue('trailers')
   await page.getByRole('button', { name: 'Historial', exact: true }).click()
   await expect(page.getByText('Caja prueba', { exact: true })).toBeVisible()
-  await expect(page.getByText('Cliente conservado', { exact: false })).toBeVisible()
+  await expect(page.getByRole('cell', { name: 'Cliente conservado' })).toBeVisible()
   await page.getByRole('button', { name: /Duplicar/ }).click()
   await expect(selector(page)).toHaveValue('universal')
   await expect(page.getByRole('combobox', { name: 'Tipo de producto', exact: true })).toHaveValue('')

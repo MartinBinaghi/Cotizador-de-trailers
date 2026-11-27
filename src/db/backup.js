@@ -1,3 +1,4 @@
+import Dexie from 'dexie'
 import { db } from './database.js'
 import { CLASE_TRAILERS, CLASES_INICIALES, normalizarNombre, validarClaseCategoria } from '../utils/clasesProductos.js'
 import { normalizarSeleccionadas, serializarSeleccionadas } from '../utils/seleccionVariables.js'
@@ -132,6 +133,8 @@ export async function combinarBackup(analisis, sobrescribirDuplicados) {
     }
   }
   await db.transaction('rw', db.clasesProductos, db.tiposTrailer, db.categorias, db.variables, db.cotizaciones, async () => {
+    // No queda en el historial de cambios (ver historial.js): para volver atrás está el backup previo.
+    Dexie.currentTransaction.sinHistorial = true
     for (const clase of analisis.clasesProductos.nuevos) {
       await db.clasesProductos.add(clase)
       resumen.agregados++

@@ -276,7 +276,7 @@ function AdminTiposTrailer({ tipos, claseId, clases, orden, setOrden, nuevo }) {
         )}
       </section>
       <FormTipo
-        key={actual?.id ?? `nuevo-${nuevo}`}
+        key={actual ? `${actual.id}-${actual.actualizado}` : `nuevo-${nuevo}`}
         tipo={actual}
         claseId={claseId}
         clases={clases}
@@ -438,7 +438,7 @@ function AdminVariables({ variables, claseId, clases, orden, setOrden, nuevo }) 
         )}
       </section>
       <FormVariable
-        key={actual?.id ?? `nuevo-${nuevo}`}
+        key={actual ? `${actual.id}-${actual.actualizado}` : `nuevo-${nuevo}`}
         variable={actual}
         categorias={categorias}
         claseId={claseId}
@@ -674,6 +674,7 @@ function BackupRestore() {
         `Se van a combinar los datos del backup con los actuales (no se elimina nada de esta computadora). ` +
         `Se encontraron ${totalNuevos} elementos nuevos` +
         (totalDuplicados > 0 ? ` y ${totalDuplicados} que ya existen localmente. ` : '. ') +
+        `Esta importación no se puede deshacer desde el historial de cambios: descargá un backup antes si querés poder volver atrás. ` +
         `¿Continuar?`
       )) {
         return

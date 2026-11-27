@@ -1,6 +1,7 @@
 import Dexie from 'dexie'
 import { CLASE_TRAILERS, CLASES_INICIALES, normalizarNombre } from '../utils/clasesProductos.js'
 import { registrarHooks } from './sincronizacion.js'
+import { registrarHistorial } from './historial.js'
 
 // Toda la data vive en el navegador (IndexedDB). No hay backend ni nube.
 export const db = new Dexie('CotizadorTrailersDB')
@@ -137,7 +138,12 @@ db.version(7).stores({
   }
 })
 
+// v8: historial de cambios (deshacer/rehacer, ver historial.js), local de cada equipo.
+// `historial` tiene lo liviano para listar; `historialDatos`, las copias de los registros.
+db.version(8).stores({ historial: '++id, deshecho', historialDatos: 'id' })
+
 registrarHooks(db)
+registrarHistorial(db)
 
 db.on('populate', tx => tx.table('clasesProductos').bulkAdd(CLASES_INICIALES))
 

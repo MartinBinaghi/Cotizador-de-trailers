@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo } from 'react'
 import { db, seedIfEmpty } from './db/database'
 import EspacioClase from './components/EspacioClase'
 import { claseDe, CLASE_UNIVERSAL, CLASE_TRAILERS } from './utils/clasesProductos'
-import { ToastProvider } from './components/Toast'
+import { ToastProvider, useToast } from './components/Toast'
+import { isTauri } from '@tauri-apps/api/core'
 import ErrorBoundary from './components/ErrorBoundary'
 import Cotizador from './pages/Cotizador'
 import Admin from './pages/Admin'
@@ -130,11 +131,47 @@ export default function App() {
         <footer className="barra-estado">
           <div ref={setZonaEstado} className="barra-estado-zona" />
           <span className="barra-estado-version">v{version}</span>
+          {isTauri() && <BotonActualizar />}
         </footer>
       </div>
       </ShellContext.Provider>
       </SincronizacionProvider>
     </ToastProvider>
+  )
+}
+
+/** Busca en GitHub Releases (latest.json) una versión nueva, la descarga, la instala y reinicia. */
+function BotonActualizar() {
+  const showToast = useToast()
+  const [estado, setEstado] = useState(null)
+
+  async function actualizar() {
+    setEstado('Buscando…')
+    try {
+      const [{ check }, { relaunch }] = await Promise.all([
+        import('@tauri-apps/plugin-updater'), import('@tauri-apps/plugin-process')
+      ])
+      const update = await check()
+      if (!update) {
+        showToast('Ya tenés la última versión')
+        return
+      }
+      if (!confirm(`Hay una versión nueva (v${update.version}). Se va a descargar, instalar y reiniciar el programa: guardá antes lo que estés editando (los datos guardados se conservan). ¿Continuar?`)) return
+      setEstado('Descargando…')
+      await update.downloadAndInstall()
+      await relaunch()
+    } catch (e) {
+      console.error('Actualización:', e)
+      showToast('No se pudo actualizar. Revisá la conexión a internet e intentá de nuevo.', 'error')
+    } finally {
+      setEstado(null)
+    }
+  }
+
+  return (
+    <button type="button" className="btn-fila btn-actualizar" onClick={actualizar} disabled={estado != null}>
+      {estado ?? 'Buscar actualización'}
+    </button>
   )
 }
 

@@ -153,6 +153,7 @@
 
 .barra-estado-zona { display: flex; flex-wrap: wrap; gap: 4px 20px; }
 .barra-estado-version { margin-left: auto; }
+.btn-actualizar { color: inherit; font-size: inherit; }
 
 @media (max-width: 760px) {
   .app { height: auto; min-height: 100vh; overflow: visible; }

@@ -163,10 +163,15 @@ Funcionalidad agregada desde v0.1.7:
 
 1. Subir la versión en los 5 archivos de arriba (en `Cargo.lock` solo la entrada `name = "app"`).
 2. Commit + push.
-3. `npm run tauri:build`.
-4. `git tag vX.Y.Z && git push origin vX.Y.Z`.
-5. `gh release create vX.Y.Z "src-tauri/target/release/bundle/nsis/Cotizador de Trailers_X.Y.Z_x64-setup.exe" --title "Cotizador vX.Y.Z" --generate-notes`
-   (se adjunta solo el `-setup.exe`, no el `.msi`).
+3. `git tag vX.Y.Z && git push origin vX.Y.Z`.
+4. `npm run release`: compila firmado, genera `latest.json` y crea el release en GitHub con el `-setup.exe`
+   y `latest.json` (no el `.msi`).
+
+**Auto-actualización**: el botón "Buscar actualización" (barra de estado, solo en la app instalada) lee
+`releases/latest/download/latest.json`, verifica la firma con la `pubkey` de `tauri.conf.json`, instala y reinicia.
+La clave privada está en `~/.tauri/cotizador-trailers.key` (sin contraseña) y **no está en el repo**:
+si se pierde, las apps instaladas no aceptan más actualizaciones (hay que generar otra y reinstalar a mano).
+Las versiones ≤ 0.2.2 no tienen el botón: esa primera actualización se instala a mano.
 
 ## Gotchas conocidos
 
@@ -176,6 +181,11 @@ Funcionalidad agregada desde v0.1.7:
 - **Localhost (navegador) ≠ app instalada (WebView2)**: descargas, clipboard, etc. hay que probarlas en la app
   empaquetada. Por eso los archivos se guardan con el diálogo nativo de Tauri (`plugin-dialog` + `plugin-fs`)
   y no con `<a download>`.
+- **Service worker viejo**: equipos que usaron versiones ≤ 0.2.1 pueden tener registrado un service worker que
+  sirve la copia vieja. `lib.rs` borra `EBWebView\Default\Service Worker` al arrancar, antes de crear la ventana
+  (por eso la ventana tiene `"create": false` y se crea en `setup`). Se borra archivo por archivo porque
+  `remove_dir_all` fallaba con el error 32 de Windows. Los datos (`IndexedDB`) están en otra carpeta.
+- **`cargo build` solo** apunta la ventana al servidor de desarrollo (localhost:5173); para probar la app real usar `npm run tauri:build`.
 - **`src-tauri/Cargo.lock`** se autorregenera con cualquier build de Rust; en un bump alcanza con editar la
   entrada de la app o correr `cargo check`.
 - **`datos-demo.json` y `datos-prueba/`** son ficticios. Una aparente inconsistencia de reglas de negocio ahí

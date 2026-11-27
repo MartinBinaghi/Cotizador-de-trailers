@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, guardarBorrador, getRedondeo } from '../db/database'
 import { calcularPrecioConGanancia, desglosarEstandarYOpcionales } from '../utils/calcularPrecio'
-import { generarPdfComparativa } from '../utils/generarPdf'
+import { generarPdfComparativa, errorPdf } from '../utils/generarPdf'
 import { formatoARS, NOTA_IVA } from '../utils/formato'
 import { variablesDesdeSeleccion } from '../utils/seleccionVariables'
 import { leerImagenComoDataUrl } from '../utils/imagenes'
@@ -178,13 +178,17 @@ export default function Comparativa({ claseId, clases }) {
         imagen: f.modelo.imagen
       }
     })
-    await generarPdfComparativa({
-      fecha: new Date().toISOString(),
-      cliente: { nombreCliente: nombreCliente.trim(), razonSocial: razonSocial.trim(), cuit: cuit.trim() },
-      observaciones: observaciones.trim(),
-      variablesInfo: variablesEnUso.map(v => ({ id: v.id, nombre: v.nombre, esOpcional: !!v.esOpcional })),
-      columnas
-    })
+    try {
+      await generarPdfComparativa({
+        fecha: new Date().toISOString(),
+        cliente: { nombreCliente: nombreCliente.trim(), razonSocial: razonSocial.trim(), cuit: cuit.trim() },
+        observaciones: observaciones.trim(),
+        variablesInfo: variablesEnUso.map(v => ({ id: v.id, nombre: v.nombre, esOpcional: !!v.esOpcional })),
+        columnas
+      })
+    } catch (err) {
+      showToast(errorPdf(err), 'error')
+    }
   }
 
   return (

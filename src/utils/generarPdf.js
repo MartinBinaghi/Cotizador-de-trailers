@@ -39,6 +39,11 @@ async function guardarPdf(doc, nombreArchivo) {
   doc.save(nombreArchivo)
 }
 
+/** Mensaje para el usuario cuando no se pudo generar o guardar el PDF. */
+export function errorPdf(err) {
+  return `No se pudo guardar el PDF. Si está abierto en otro programa, cerralo e intentá de nuevo. (${err?.message ?? err})`
+}
+
 function formatoFechaArchivo(fechaIso) {
   const fecha = new Date(fechaIso)
   const pad = n => String(n).padStart(2, '0')

@@ -91,15 +91,14 @@ export function calcularPrecioConGanancia(tipoTrailer, variables = [], redondeo 
 /**
  * Separa un resultado (de calcularPrecio o del `valor` de calcularPrecioConGanancia)
  * en precio estándar (base + variables no opcionales) y total de adicionales opcionales.
- * @param {{base: number, detalle: Array<{monto: number, esOpcional: boolean}>}} resultado
+ * La diferencia del redondeo queda en el precio estándar, así los dos suman el total.
+ * @param {{base: number, precioFinal: number, detalle: Array<{monto: number, esOpcional: boolean}>}} resultado
  * @returns {{precioEstandar: number, totalOpcionales: number}}
  */
 export function desglosarEstandarYOpcionales(resultado) {
   const totalOpcionales = resultado.detalle
     .filter(d => d.esOpcional)
     .reduce((acc, d) => acc + d.monto, 0)
-  const precioEstandar = resultado.base + resultado.detalle
-    .filter(d => !d.esOpcional)
-    .reduce((acc, d) => acc + d.monto, 0)
+  const precioEstandar = resultado.precioFinal - totalOpcionales
   return { precioEstandar, totalOpcionales }
 }

@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/database'
 import { calcularPrecioConGanancia } from '../utils/calcularPrecio'
-import { generarPdfCotizacion } from '../utils/generarPdf'
+import { generarPdfCotizacion, errorPdf } from '../utils/generarPdf'
 import { formatoARS, NOTA_IVA } from '../utils/formato'
 import { normalizarSeleccionadas, variablesDesdeSeleccion } from '../utils/seleccionVariables'
 import { useToast } from '../components/Toast'
@@ -76,6 +76,14 @@ export default function Historial({ onDuplicar }) {
   }
 
   async function descargarPdf(c) {
+    try {
+      await generarPdfHistorico(c)
+    } catch (err) {
+      showToast(errorPdf(err), 'error')
+    }
+  }
+
+  async function generarPdfHistorico(c) {
     if (c.snapshot) {
       // Cotizaciones con snapshot: el PDF sale del desglose guardado al
       // cotizar, inmune a cambios o bajas posteriores en el catálogo.

@@ -25,7 +25,11 @@ export function leerImagenComoDataUrl(file) {
         const canvas = document.createElement('canvas')
         canvas.width = width
         canvas.height = height
-        canvas.getContext('2d').drawImage(img, 0, 0, width, height)
+        const ctx = canvas.getContext('2d')
+        // JPEG no tiene transparencia: sin este fondo, lo transparente de un PNG queda negro.
+        ctx.fillStyle = '#FFFFFF'
+        ctx.fillRect(0, 0, width, height)
+        ctx.drawImage(img, 0, 0, width, height)
         resolve(canvas.toDataURL('image/jpeg', CALIDAD_JPEG))
       }
       img.src = reader.result

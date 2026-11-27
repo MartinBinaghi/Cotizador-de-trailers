@@ -1,5 +1,5 @@
 import Dexie from 'dexie'
-import { normalizarNombre } from '../utils/clasesProductos.js'
+import { claseDe, normalizarNombre } from '../utils/clasesProductos.js'
 import { normalizarSeleccionadas, serializarSeleccionadas } from '../utils/seleccionVariables.js'
 
 /*
@@ -202,14 +202,21 @@ export async function aplicarEstado(db, estado) {
     const tipoPorUid = new Map((await db.tiposTrailer.toArray()).map(t => [t.uid, t.id]))
     const variablePorUid = new Map((await db.variables.toArray()).map(v => [v.uid, v.id]))
     await aplicarTabla('cotizaciones', estado.cotizaciones, r => {
-      const claseId = r.claseId == null ? null : claseLocal(r.claseId)
-      if (claseId === undefined) return null
+      let claseId = r.claseId == null ? null : claseLocal(r.claseId)
+      let historica = null
+      if (claseId === undefined) {
+        // Clase eliminada (acá o en otro equipo): la cotización se conserva como histórica,
+        // igual que hace eliminarClase. Si la clase todavía no llegó, se reintenta.
+        if (!r.claseEliminada && !tumbas.has(`clasesProductos:${r.claseId}`)) return null
+        claseId = r.claseId
+        historica = { claseEliminada: true }
+      }
       const seleccion = {}
       for (const { uid, cantidad } of r.variablesSeleccionadas ?? []) {
         if (variablePorUid.has(uid)) seleccion[variablePorUid.get(uid)] = cantidad
       }
       return {
-        ...quitar(r, 'tipoUid'), claseId,
+        ...quitar(r, 'tipoUid'), claseId, ...historica,
         // El snapshot conserva el PDF aunque el producto no exista en este equipo.
         tipoTrailerId: tipoPorUid.get(r.tipoUid) ?? null,
         variablesSeleccionadas: serializarSeleccionadas(seleccion)
@@ -222,6 +229,13 @@ export async function aplicarEstado(db, estado) {
       for (const registro of await tabla.toArray()) {
         const uid = uidDe(nombre, registro)
         if (borradoDespues(nombre, { uid, actualizado: registro.actualizado })) {
+          if (nombre === 'clasesProductos') {
+            // Como eliminarClase: el historial de la clase queda marcado como de una clase eliminada.
+            await db.cotizaciones.filter(c => !c.claseEliminada && claseDe(c) === registro.id).modify(c => {
+              c.claseEliminada = true
+              c.claseNombre ??= registro.nombre
+            })
+          }
           await tabla.delete(registro.id)
           cambios++
         }
@@ -252,20 +266,33 @@ export async function sincronizarCarpeta(db, io, { equipo, escribir, leidos = ne
   const propio = archivoPropio(equipo)
   const archivos = (await io.listar()).filter(a => a.nombre.startsWith(PREFIJO_ARCHIVO) && a.nombre.endsWith('.json'))
   let cambios = 0
+  // Un archivo ilegible (a medio bajar del Drive, dañado o de una versión más nueva) no frena
+  // a los demás ni la escritura del propio: se informa al final y se reintenta en la próxima pasada.
+  const errores = []
   for (const archivo of archivos) {
     if (archivo.nombre === propio || leidos.get(archivo.nombre) === archivo.modificado) continue
-    const estado = JSON.parse(await io.leer(archivo.nombre))
-    if (estado.formato > FORMATO_SYNC) {
-      throw new Error('Otro equipo usa una versión más nueva del cotizador. Actualizá esta computadora para sincronizar.')
+    try {
+      let estado
+      try {
+        estado = JSON.parse(await io.leer(archivo.nombre))
+      } catch {
+        throw new Error(`No se pudo leer ${archivo.nombre} (puede estar copiándose todavía).`)
+      }
+      if (estado.formato > FORMATO_SYNC) {
+        throw new Error('Otro equipo usa una versión más nueva del cotizador. Actualizá esta computadora para sincronizar.')
+      }
+      cambios += await aplicarEstado(db, estado)
+      leidos.set(archivo.nombre, archivo.modificado)
+    } catch (err) {
+      errores.push(err)
     }
-    cambios += await aplicarEstado(db, estado)
-    leidos.set(archivo.nombre, archivo.modificado)
   }
   const tieneArchivo = archivos.some(a => a.nombre === propio)
   if (escribir || !tieneArchivo) {
     const estado = await exportarEstado(db)
     await io.escribir(propio, JSON.stringify({ formato: FORMATO_SYNC, equipo, exportado: Date.now(), ...estado }))
   }
+  if (errores.length) throw errores[0]
   return {
     cambios,
     equipos: archivos.map(a => ({ nombre: a.nombre, modificado: a.modificado, propio: a.nombre === propio }))

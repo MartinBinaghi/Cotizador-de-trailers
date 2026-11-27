@@ -302,14 +302,18 @@ function FormTipo({ tipo, claseId, clases, enfocar, onCerrar }) {
     const err = validarTipoTrailer(datos)
     if (err) { setError(err); return }
     const registro = { claseId: datos.claseId, nombre: datos.nombre.trim(), precioBase: Number(datos.precioBase), ganancia: Number(datos.ganancia) || 1 }
-    if (tipo) {
-      await db.tiposTrailer.update(tipo.id, registro)
-      showToast('Cambios guardados')
-      onCerrar()
-    } else {
-      await db.tiposTrailer.add(registro)
-      setDatos(vacio)
-      showToast('Tipo de producto agregado')
+    try {
+      if (tipo) {
+        await db.tiposTrailer.update(tipo.id, registro)
+        showToast('Cambios guardados')
+        onCerrar()
+      } else {
+        await db.tiposTrailer.add(registro)
+        setDatos(vacio)
+        showToast('Tipo de producto agregado')
+      }
+    } catch (err) {
+      setError(`No se pudo guardar: ${err.message}`)
     }
   }
 
@@ -454,15 +458,13 @@ function FormVariable({ variable, categorias, claseId, clases, enfocar, onCerrar
   }
   const [datos, setDatos] = useState(() => {
     if (!variable) return vacio
-    // Solo los descuentos porcentuales se editan en positivo (guardarVariable
-    // re-invierte el signo al guardar). El resto muestra su valor tal cual,
-    // para no convertir silenciosamente un valor negativo en positivo.
-    const esDescuentoPorcentual = variable.tipoModificador === 'porcentual' &&
-      !!categorias.find(c => c.id === variable.categoriaId)?.esDescuento
+    // Los descuentos (% o $) se editan en positivo: guardarVariable les pone el signo
+    // según la categoría. El resto muestra su valor tal cual.
+    const esDescuento = !!categorias.find(c => c.id === variable.categoriaId)?.esDescuento
     return {
       claseId: claseDe(variable), categoriaId: variable.categoriaId ?? '', nombre: variable.nombre,
       tipoModificador: variable.tipoModificador,
-      valor: String(esDescuentoPorcentual ? Math.abs(variable.valor) : variable.valor),
+      valor: String(esDescuento ? Math.abs(variable.valor) : variable.valor),
       ganancia: String(variable.ganancia ?? 1), aplicaSobre: variable.aplicaSobre ?? 'base',
       permiteCantidad: !!variable.permiteCantidad, esOpcional: !!variable.esOpcional
     }

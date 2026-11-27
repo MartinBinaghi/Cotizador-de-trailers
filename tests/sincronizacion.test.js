@@ -194,3 +194,43 @@ test('rechaza el archivo de una versión más nueva del cotizador', async () => 
   }
   await assert.rejects(sincronizarCarpeta(db, io, { equipo: 'este' }), /versión más nueva/)
 })
+
+test('las cotizaciones de una clase eliminada en otro equipo se conservan y se marcan', async () => {
+  const local = await db.cotizaciones.add({ claseId: 'cajas', fecha: '2026-01-01T00:00:00.000Z', precioFinal: 500,
+    cliente: { nombreCliente: 'Local', razonSocial: '', cuit: '' }, variablesSeleccionadas: [] })
+  const remoto = await estadoRemoto()
+  remoto.eliminados.push({ clave: 'clasesProductos:cajas', tabla: 'clasesProductos', uid: 'cajas', fecha: Date.now() + 1000 })
+  await aplicarEstado(db, remoto)
+  assert.equal(await db.clasesProductos.get('cajas'), undefined)
+  const marcada = await db.cotizaciones.get(local)
+  assert.equal(marcada.claseEliminada, true)
+  assert.equal(marcada.claseNombre, 'Cajas')
+
+  // Una cotización de esa clase que llega después (de un tercer equipo) también se acepta.
+  remoto.cotizaciones = [{ uid: 'uid-tercero', claseId: 'cajas', fecha: '2026-02-01T00:00:00.000Z', precioFinal: 700,
+    cliente: { nombreCliente: 'Tercero', razonSocial: '', cuit: '' }, variablesSeleccionadas: [], actualizado: Date.now(),
+    snapshot: { tipoTrailerNombre: 'Caja', base: 700, detalle: [] } }]
+  assert.equal(await aplicarEstado(db, remoto), 1)
+  const llegada = await db.cotizaciones.where('uid').equals('uid-tercero').first()
+  assert.equal(llegada.claseEliminada, true)
+})
+
+test('un archivo ilegible no impide leer los demás ni escribir el propio', async () => {
+  await cargarCatalogo()
+  const otro = await estadoRemoto()
+  otro.tiposTrailer.push({ uid: 'uid-otro', nombre: 'Tanque', claseId: 'trailers', precioBase: 9, actualizado: Date.now() })
+  const carpeta = new Map([
+    ['cotizador-sync-roto.json', '{"formato": 1, "tiposTr'],
+    ['cotizador-sync-otro.json', JSON.stringify({ formato: 1, ...otro })]
+  ])
+  const io = {
+    listar: async () => [...carpeta.keys()].map(nombre => ({ nombre, modificado: 1 })),
+    leer: async nombre => carpeta.get(nombre),
+    escribir: async (nombre, texto) => carpeta.set(nombre, texto)
+  }
+  const leidos = new Map()
+  await assert.rejects(sincronizarCarpeta(db, io, { equipo: 'este', escribir: true, leidos }), /No se pudo leer cotizador-sync-roto/)
+  assert.ok(await db.tiposTrailer.where('uid').equals('uid-otro').first(), 'aplicó el archivo sano')
+  assert.ok(carpeta.has('cotizador-sync-este.json'), 'escribió el propio')
+  assert.ok(!leidos.has('cotizador-sync-roto.json'), 'el roto se reintenta en la próxima pasada')
+})

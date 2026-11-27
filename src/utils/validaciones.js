@@ -32,8 +32,9 @@ export function validarVariable({ categoria, nombre, valor, tipoModificador, gan
   if (valor === '' || valor === null || valor === undefined) return 'El valor es obligatorio.'
   const num = Number(valor)
   if (Number.isNaN(num)) return 'El valor debe ser un número.'
-  // Variables 'fijo' no pueden ser negativas, pero 'porcentual' sí (para descuentos)
-  if (tipoModificador === 'fijo' && num < 0) return 'El valor fijo no puede ser negativo.'
+  // En categorías de descuento el valor se carga en positivo y se guarda restando
+  // (ver guardarVariable); fuera de ellas no se admiten valores negativos.
+  if (tipoModificador === 'fijo' && num < 0 && !esDescuento) return 'El valor fijo no puede ser negativo.'
   if (tipoModificador === 'porcentual' && num < 0 && !esDescuento) {
     return 'Los porcentajes negativos solo se permiten en categorías de descuento.'
   }

@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, guardarBorrador, getRedondeo, setRedondeo } from '../db/database'
 import { calcularPrecioConGanancia, desglosarEstandarYOpcionales } from '../utils/calcularPrecio'
-import { generarPdfCotizacion } from '../utils/generarPdf'
+import { generarPdfCotizacion, errorPdf } from '../utils/generarPdf'
 import { formatoARS, NOTA_IVA } from '../utils/formato'
 import { normalizarSeleccionadas, serializarSeleccionadas, variablesDesdeSeleccion } from '../utils/seleccionVariables'
 import { leerImagenComoDataUrl } from '../utils/imagenes'
@@ -195,6 +195,8 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales, cl
         }
       })
       showToast('Cotización guardada')
+    } catch (err) {
+      showToast(`No se pudo guardar la cotización: ${err.message}`, 'error')
     } finally {
       setGuardando(false)
     }
@@ -205,15 +207,19 @@ export default function Cotizador({ datosIniciales, onConsumirDatosIniciales, cl
       showToast('Elegí un tipo de producto antes de generar el PDF', 'error')
       return
     }
-    await generarPdfCotizacion({
-      cliente: { nombreCliente: nombreCliente.trim(), razonSocial: razonSocial.trim(), cuit: cuit.trim() },
-      fecha: new Date().toISOString(),
-      tipoTrailerNombre: tipoTrailer.nombre,
-      variables: variablesSeleccionadas,
-      resultado,
-      imagenes,
-      observaciones: observaciones.trim()
-    })
+    try {
+      await generarPdfCotizacion({
+        cliente: { nombreCliente: nombreCliente.trim(), razonSocial: razonSocial.trim(), cuit: cuit.trim() },
+        fecha: new Date().toISOString(),
+        tipoTrailerNombre: tipoTrailer.nombre,
+        variables: variablesSeleccionadas,
+        resultado,
+        imagenes,
+        observaciones: observaciones.trim()
+      })
+    } catch (err) {
+      showToast(errorPdf(err), 'error')
+    }
   }
 
   const horaGuardado = ultimoGuardado?.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })

@@ -11,13 +11,18 @@ export async function guardarCategoria(datos) {
     if (repetida) throw new Error('Ya existe una categoría con ese nombre en esta clase.')
     const registro = { nombre: datos.nombre.trim(), claseId: datos.claseId, esDescuento: !!datos.esDescuento }
     if (!datos.id) return db.categorias.add(registro)
+    const anterior = await db.categorias.get(datos.id)
     const incompatibles = await db.variables.where('categoriaId').equals(datos.id)
       .filter(variable => !!validarClaseCategoria(variable, registro)).toArray()
     if (incompatibles.length) {
       throw new Error(`No se puede cambiar la clase: ${incompatibles.length} variable(s) quedarían en una categoría incompatible. Mové esas variables a otra categoría compatible o dejá esta categoría como Universal.`)
     }
     await db.categorias.update(datos.id, registro)
-    await db.variables.where('categoriaId').equals(datos.id).modify({ categoria: registro.nombre })
+    await db.variables.where('categoriaId').equals(datos.id).modify(variable => {
+      variable.categoria = registro.nombre
+      // Al marcar o desmarcar "descuento", los valores pasan a restar o a sumar.
+      if (!!anterior?.esDescuento !== registro.esDescuento) variable.valor = signoSegunCategoria(variable.valor, registro.esDescuento)
+    })
     return datos.id
   })
 }
@@ -39,11 +44,11 @@ export async function guardarVariable(datos, nuevaCategoria = null) {
     const error = validarVariable({ ...datos, categoria: categoria.nombre }, categoria.esDescuento)
     if (error) throw new Error(error)
     if (!categoria.id) categoria.id = await db.categorias.add(categoria)
-    const valor = Number(datos.valor)
+    const valor = signoSegunCategoria(Number(datos.valor), categoria.esDescuento)
     const registro = {
       claseId: datos.claseId, categoriaId: categoria.id, categoria: categoria.nombre,
       nombre: datos.nombre.trim(), tipoModificador: datos.tipoModificador,
-      valor: categoria.esDescuento && datos.tipoModificador === 'porcentual' ? -Math.abs(valor) : valor,
+      valor,
       ganancia: Number(datos.ganancia) || 1, aplicaSobre: datos.aplicaSobre,
       permiteCantidad: !!datos.permiteCantidad, esOpcional: !!datos.esOpcional
     }
@@ -51,4 +56,9 @@ export async function guardarVariable(datos, nuevaCategoria = null) {
     await db.variables.update(datos.id, registro)
     return datos.id
   })
+}
+
+/** Las variables de una categoría de descuento restan (valor negativo); las demás suman. */
+export function signoSegunCategoria(valor, esDescuento) {
+  return esDescuento ? -Math.abs(valor) : Math.abs(valor)
 }
